@@ -9,7 +9,8 @@ import {
   SendOutlined, 
   FolderOutlined, 
   ClockCircleOutlined, 
-  FolderOpenOutlined
+  FolderOpenOutlined,
+  PictureOutlined
 } from '@ant-design/icons';
 import { authAPI, homeAPI, articleAPI, photoAPI, bookmarkAPI, eventAPI } from '../utils/api';
 import { getToken, setToken, removeToken } from '../utils/auth';
@@ -229,6 +230,7 @@ const Sidebar = () => {
       { key: 'categories', label: '分类管理' },
       { key: 'articles', label: '文章管理' },
       { key: 'photos', label: '相册管理' },
+      { key: 'images', label: '图像管理', icon: PictureOutlined },
       { key: 'bookmarks', label: '导航管理' },
       { key: 'events', label: '时间事件管理' },
       { key: 'data', label: '数据管理' },
@@ -308,10 +310,11 @@ const Sidebar = () => {
             {adminTabs.map((tab) => {
               const isActive = (tab.key === 'password' && location.pathname === '/admin/password') ||
                                (activeTab === tab.key && location.pathname !== '/admin/home' && location.pathname !== '/admin/password');
+              const Icon = tab.icon;
               return (
                 <div
                   key={tab.key}
-                  className={`px-3 py-2 rounded cursor-pointer transition-colors ${
+                  className={`px-3 py-2 rounded cursor-pointer transition-colors flex items-center gap-2 ${
                     isActive
                       ? 'text-text-100'
                       : 'bg-white text-text-100 hover:bg-bg-200'
@@ -319,6 +322,7 @@ const Sidebar = () => {
                   style={isActive ? { backgroundColor: '#cccccc' } : {}}
                   onClick={() => handleTabClick(tab.key)}
                 >
+                  {Icon && <Icon className="text-sm" />}
                   <span className="text-sm font-medium">{tab.label}</span>
                 </div>
               );

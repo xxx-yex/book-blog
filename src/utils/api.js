@@ -61,6 +61,18 @@ export const articleAPI = {
   batchDelete: (ids) => api.post('/articles/batch-delete', { ids }),
   batchImport: (articles) => api.post('/articles/batch-import', { articles }),
   incrementViews: (id) => api.post(`/articles/${id}/views`),
+  uploadImage: (formData) => {
+    const token = localStorage.getItem('token');
+    return api.post('/articles/upload-image', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        Authorization: token ? `Bearer ${token}` : '',
+      },
+    });
+  },
+  getImages: () => api.get('/articles/images/list'),
+  deleteImage: (filename) => api.delete(`/articles/images/${filename}`),
+  convertBase64Images: () => api.post('/articles/images/convert-base64'),
 };
 
 // 相册相关

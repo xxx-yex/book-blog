@@ -3,7 +3,7 @@ import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import ReactQuill from 'react-quill';
 import 'react-quill/dist/quill.snow.css';
-import { Input, Button, Select, Form, message, Card, Space } from 'antd';
+import { Input, Button, Select, Form, message, Card, Space, Row, Col } from 'antd';
 import { articleAPI, categoryAPI } from '../../utils/api';
 import { isAuthenticated } from '../../utils/auth';
 
@@ -55,6 +55,7 @@ const ArticleEdit = () => {
       setLoading(false);
     }
   };
+
 
   const modules = {
     toolbar: [
@@ -118,27 +119,32 @@ const ArticleEdit = () => {
               <Input placeholder="输入文章标题" size="large" />
             </Form.Item>
 
-            <Form.Item
-              name="category"
-              label="选择分类"
-              rules={[{ required: true, message: '请选择分类' }]}
-            >
-              <Select
-                placeholder="选择分类"
-                size="large"
-                options={categories.map(cat => ({
-                  value: cat._id,
-                  label: cat.name,
-                }))}
-              />
-            </Form.Item>
-
-            <Form.Item
-              name="tags"
-              label="标签（用逗号分隔）"
-            >
-              <Input placeholder="例如：JavaScript, React, 前端" size="large" />
-            </Form.Item>
+            <Row gutter={16}>
+              <Col xs={24} sm={12}>
+                <Form.Item
+                  name="category"
+                  label="选择分类"
+                  rules={[{ required: true, message: '请选择分类' }]}
+                >
+                  <Select
+                    placeholder="选择分类"
+                    size="large"
+                    options={categories.map(cat => ({
+                      value: cat._id,
+                      label: cat.name,
+                    }))}
+                  />
+                </Form.Item>
+              </Col>
+              <Col xs={24} sm={12}>
+                <Form.Item
+                  name="tags"
+                  label="标签（用逗号分隔）"
+                >
+                  <Input placeholder="例如：JavaScript, React, 前端" size="large" />
+                </Form.Item>
+              </Col>
+            </Row>
 
             <Form.Item
               label="文章内容"

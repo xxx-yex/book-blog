@@ -21,7 +21,9 @@ import {
   ImportOutlined,
   UploadOutlined,
   LinkOutlined,
-  ClockCircleOutlined
+  ClockCircleOutlined,
+  ReloadOutlined,
+  SwapOutlined
 } from '@ant-design/icons';
 import { categoryAPI, articleAPI, photoAPI, bookmarkAPI, homeAPI, eventAPI } from '../../utils/api';
 import { isAuthenticated } from '../../utils/auth';
@@ -54,6 +56,9 @@ const Admin = () => {
   const [editingEvent, setEditingEvent] = useState(null);
   const [eventForm] = Form.useForm();
   const [selectedEventIds, setSelectedEventIds] = useState([]);
+  const [images, setImages] = useState([]);
+  const [imagesLoading, setImagesLoading] = useState(false);
+  const [selectedImageNames, setSelectedImageNames] = useState([]);
   
   // 从 URL 参数或 localStorage 获取当前选中的标签
   const activeTab = searchParams.get('tab') || localStorage.getItem('adminActiveTab') || 'categories';
@@ -89,6 +94,77 @@ const Admin = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const loadImages = async () => {
+    setImagesLoading(true);
+    try {
+      const data = await articleAPI.getImages();
+      setImages(data);
+    } catch (error) {
+      message.error('加载图片列表失败');
+    } finally {
+      setImagesLoading(false);
+    }
+  };
+
+  const handleImageDelete = async (filename) => {
+    try {
+      await articleAPI.deleteImage(filename);
+      message.success('图片删除成功');
+      loadImages();
+    } catch (error) {
+      message.error(error.response?.data?.message || '删除失败');
+    }
+  };
+
+  const handleBatchImageDelete = async () => {
+    try {
+      await Promise.all(selectedImageNames.map(filename => articleAPI.deleteImage(filename)));
+      message.success(`成功删除 ${selectedImageNames.length} 张图片`);
+      setSelectedImageNames([]);
+      loadImages();
+    } catch (error) {
+      message.error('批量删除失败');
+    }
+  };
+
+  const handleConvertBase64Images = async () => {
+    Modal.confirm({
+      title: '确认转换',
+      content: '此操作将扫描所有文章，将base64格式的图片转换为文件存储。转换后可以更好地管理图片，节省数据库空间。是否继续？',
+      okText: '确定',
+      cancelText: '取消',
+      onOk: async () => {
+        setImagesLoading(true);
+        try {
+          const result = await articleAPI.convertBase64Images();
+          message.success(
+            `转换完成！共找到 ${result.totalImages} 张base64图片，成功转换 ${result.converted} 张`,
+            5
+          );
+          if (result.errors && result.errors.length > 0) {
+            console.error('转换错误:', result.errors);
+            message.warning(`有 ${result.errors.length} 个错误，请查看控制台`);
+          }
+          // 刷新图片列表
+          loadImages();
+        } catch (error) {
+          message.error(error.response?.data?.message || '转换失败');
+        } finally {
+          setImagesLoading(false);
+        }
+      },
+    });
+  };
+
+  // 格式化文件大小
+  const formatFileSize = (bytes) => {
+    if (bytes === 0) return '0 B';
+    const k = 1024;
+    const sizes = ['B', 'KB', 'MB', 'GB'];
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    return Math.round(bytes / Math.pow(k, i) * 100) / 100 + ' ' + sizes[i];
   };
 
   const handleCategorySubmit = async (values) => {
@@ -1053,6 +1129,137 @@ const Admin = () => {
                 setSelectedPhotoIds(selectedRowKeys);
               },
             }}
+          />
+        </Card>
+      ),
+    },
+    {
+      key: 'images',
+      label: '图像管理',
+      children: (
+        <Card>
+          <div className="mb-4 flex justify-between items-center">
+            <div>
+              <h2 className="text-lg font-semibold text-black mb-2">文章图片管理</h2>
+              <p className="text-sm text-text-200 mb-2">
+                这里显示的是文章编辑时上传的图片，存储在 <code className="bg-bg-200 px-2 py-1 rounded">/uploads/articles/</code> 目录中。
+              </p>
+              <p className="text-sm text-red-500 mb-0">
+                注意：删除图片可能会影响已发布的文章显示，请谨慎操作！
+              </p>
+            </div>
+            <Space>
+              <Button 
+                type="primary"
+                icon={<SwapOutlined />}
+                onClick={handleConvertBase64Images}
+                loading={imagesLoading}
+              >
+                转换Base64图片
+              </Button>
+              {selectedImageNames.length > 0 && (
+                <Button 
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={handleBatchImageDelete}
+                >
+                  批量删除 ({selectedImageNames.length})
+                </Button>
+              )}
+              <Button 
+                icon={<ReloadOutlined />}
+                onClick={loadImages}
+                loading={imagesLoading}
+              >
+                刷新列表
+              </Button>
+            </Space>
+          </div>
+          <Table
+            columns={[
+              {
+                title: '预览',
+                dataIndex: 'url',
+                key: 'preview',
+                width: 120,
+                render: (url) => (
+                  <img 
+                    src={`http://localhost:3001${url}`}
+                    alt="预览"
+                    className="w-20 h-20 object-cover rounded cursor-pointer"
+                    onClick={() => {
+                      window.open(`http://localhost:3001${url}`, '_blank');
+                    }}
+                  />
+                ),
+              },
+              {
+                title: '文件名',
+                dataIndex: 'filename',
+                key: 'filename',
+                ellipsis: true,
+              },
+              {
+                title: '文件大小',
+                dataIndex: 'size',
+                key: 'size',
+                width: 100,
+                render: (size) => formatFileSize(size),
+              },
+              {
+                title: '上传时间',
+                dataIndex: 'createdAt',
+                key: 'createdAt',
+                width: 180,
+                render: (date) => new Date(date).toLocaleString('zh-CN'),
+              },
+              {
+                title: '修改时间',
+                dataIndex: 'modifiedAt',
+                key: 'modifiedAt',
+                width: 180,
+                render: (date) => new Date(date).toLocaleString('zh-CN'),
+              },
+              {
+                title: '操作',
+                key: 'action',
+                width: 100,
+                render: (_, record) => (
+                  <Space>
+                    <Button 
+                      type="link"
+                      onClick={() => window.open(`http://localhost:3001${record.url}`, '_blank')}
+                    >
+                      查看
+                    </Button>
+                    <Popconfirm
+                      title="确定要删除这张图片吗？"
+                      description="删除后可能会影响使用该图片的文章显示"
+                      onConfirm={() => handleImageDelete(record.filename)}
+                    >
+                      <Button type="link" danger>
+                        删除
+                      </Button>
+                    </Popconfirm>
+                  </Space>
+                ),
+              },
+            ]}
+            dataSource={images}
+            rowKey="filename"
+            loading={imagesLoading}
+            pagination={{ pageSize: 20 }}
+            rowSelection={{
+              selectedRowKeys: selectedImageNames,
+              onChange: (selectedRowKeys) => {
+                setSelectedImageNames(selectedRowKeys);
+              },
+            }}
+            onRow={(record) => ({
+              onDoubleClick: () => {
+                window.open(`http://localhost:3001${record.url}`, '_blank');
+              },
+            })}
           />
         </Card>
       ),

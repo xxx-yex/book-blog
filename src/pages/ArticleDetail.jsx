@@ -1,7 +1,7 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { LikeOutlined, EyeOutlined, ArrowLeftOutlined } from '@ant-design/icons';
-import { Button, message } from 'antd';
+import { Button, message, Image } from 'antd';
 import { articleAPI } from '../utils/api';
 import './ArticleDetail.css';
 
@@ -10,10 +10,35 @@ const ArticleDetail = () => {
   const navigate = useNavigate();
   const [article, setArticle] = useState(null);
   const [loading, setLoading] = useState(true);
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewImage, setPreviewImage] = useState('');
+  const contentRef = useRef(null);
 
   useEffect(() => {
     loadArticle();
   }, [id]);
+
+  // 处理图片点击预览
+  useEffect(() => {
+    if (!contentRef.current) return;
+
+    const handleImageClick = (e) => {
+      if (e.target.tagName === 'IMG') {
+        e.preventDefault();
+        e.stopPropagation();
+        const src = e.target.src;
+        setPreviewImage(src);
+        setPreviewVisible(true);
+      }
+    };
+
+    const contentElement = contentRef.current;
+    contentElement.addEventListener('click', handleImageClick);
+
+    return () => {
+      contentElement.removeEventListener('click', handleImageClick);
+    };
+  }, [article]);
 
   const loadArticle = async () => {
     try {
@@ -108,12 +133,29 @@ const ArticleDetail = () => {
 
           {/* 文章内容 */}
           <div 
+            ref={contentRef}
             className="prose max-w-none article-content prose-headings:text-text-100 prose-p:text-text-200 prose-a:text-text-100 prose-strong:text-text-100"
             dangerouslySetInnerHTML={{ __html: article.content }}
             style={{
               lineHeight: '1.8',
             }}
           />
+          
+          {/* 图片预览 */}
+          <div style={{ display: 'none' }}>
+            <Image
+              preview={{
+                visible: previewVisible,
+                src: previewImage,
+                onVisibleChange: (visible) => {
+                  setPreviewVisible(visible);
+                  if (!visible) {
+                    setPreviewImage('');
+                  }
+                },
+              }}
+            />
+          </div>
         </div>
       </div>
     </div>

@@ -74,6 +74,12 @@
   height: auto;
   border-radius: 6px;
   margin: 1em 0;
+  cursor: pointer;
+  transition: opacity 0.3s ease;
+}
+
+.article-content img:hover {
+  opacity: 0.8;
 }
 
 .article-content a {
