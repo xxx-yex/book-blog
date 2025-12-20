@@ -257,12 +257,13 @@ const Admin = () => {
       setLoading(true);
       
       // 获取所有数据
-      const [categoriesData, articlesData, photosData, bookmarksData, homeData] = await Promise.all([
+      const [categoriesData, articlesData, photosData, bookmarksData, homeData, eventsData] = await Promise.all([
         categoryAPI.getAll(),
         articleAPI.getAll(),
         photoAPI.getAll(),
         bookmarkAPI.getAll(),
         homeAPI.get(),
+        eventAPI.getAll(),
       ]);
 
       // 构建导出数据对象（包含元数据）
@@ -276,6 +277,7 @@ const Admin = () => {
           photos: photosData || [],
           bookmarks: bookmarksData || {},
           home: homeData || {},
+          events: eventsData || [],
         },
       };
 
@@ -313,7 +315,7 @@ const Admin = () => {
         return false;
       }
 
-      const { categories, articles, photos, bookmarks, home } = importData.data;
+      const { categories, articles, photos, bookmarks, home, events } = importData.data;
 
       // 统计数据量
       const stats = {
@@ -322,9 +324,10 @@ const Admin = () => {
         photos: Array.isArray(photos) ? photos.length : 0,
         bookmarks: bookmarks ? Object.keys(bookmarks).reduce((sum, key) => sum + (bookmarks[key]?.length || 0), 0) : 0,
         home: home ? 1 : 0,
+        events: Array.isArray(events) ? events.length : 0,
       };
 
-      const totalItems = stats.categories + stats.articles + stats.photos + stats.bookmarks + stats.home;
+      const totalItems = stats.categories + stats.articles + stats.photos + stats.bookmarks + stats.home + stats.events;
 
       if (totalItems === 0) {
         message.error('导入文件为空');
@@ -341,6 +344,7 @@ const Admin = () => {
               {stats.articles > 0 && <li>文章：{stats.articles} 篇</li>}
               {stats.photos > 0 && <li>相册：{stats.photos} 张</li>}
               {stats.bookmarks > 0 && <li>书签：{stats.bookmarks} 个</li>}
+              {stats.events > 0 && <li>时间事件：{stats.events} 个</li>}
               {stats.home > 0 && <li>首页配置：1 个</li>}
             </ul>
             <p className="mt-3 text-red-600 text-sm font-semibold">
@@ -359,6 +363,7 @@ const Admin = () => {
               articles: { success: 0, failed: 0 },
               photos: { success: 0, failed: 0 },
               bookmarks: { success: 0, failed: 0 },
+              events: { success: 0, failed: 0 },
               home: { success: 0, failed: 0 },
             };
 
@@ -407,6 +412,19 @@ const Admin = () => {
                       console.error('导入书签失败:', bookmark, error);
                     }
                   }
+                }
+              }
+            }
+
+            // 导入时间事件
+            if (Array.isArray(events) && events.length > 0) {
+              for (const event of events) {
+                try {
+                  await eventAPI.create(event);
+                  results.events.success++;
+                } catch (error) {
+                  results.events.failed++;
+                  console.error('导入时间事件失败:', event, error);
                 }
               }
             }
@@ -594,6 +612,8 @@ const Admin = () => {
     eventForm.setFieldsValue({
       title: record.title,
       description: record.description,
+      location: record.location || '',
+      mood: record.mood || '',
       date: record.date ? new Date(record.date).toISOString().split('T')[0] : '',
     });
     setEventModalOpen(true);
@@ -1094,6 +1114,20 @@ const Admin = () => {
                 render: (text) => text || '-',
               },
               {
+                title: '地点',
+                dataIndex: 'location',
+                key: 'location',
+                ellipsis: true,
+                render: (text) => text || '-',
+              },
+              {
+                title: '心情',
+                dataIndex: 'mood',
+                key: 'mood',
+                ellipsis: true,
+                render: (text) => text || '-',
+              },
+              {
                 title: '日期',
                 dataIndex: 'date',
                 key: 'date',
@@ -1159,7 +1193,7 @@ const Admin = () => {
               <div className="p-4 border border-bg-300 rounded-lg">
                 <h3 className="text-base font-semibold text-text-100 mb-2">导出数据</h3>
                 <p className="text-sm text-text-200 mb-4">
-                  导出所有数据为 JSON 格式文件，包含：分类、文章、相册、书签、首页配置
+                  导出所有数据为 JSON 格式文件，包含：分类、文章、相册、书签、时间事件、首页配置
                 </p>
                 <Button
                   className="bg-gray-800 text-white hover:bg-gray-700 border-none"
@@ -1426,6 +1460,18 @@ const Admin = () => {
               label="描述"
             >
               <Input.TextArea rows={4} placeholder="请输入时间事件描述（可选）" />
+            </Form.Item>
+            <Form.Item
+              name="location"
+              label="地点"
+            >
+              <Input placeholder="请输入地点（可选）" />
+            </Form.Item>
+            <Form.Item
+              name="mood"
+              label="心情"
+            >
+              <Input placeholder="请输入心情（可选）" />
             </Form.Item>
             <Form.Item
               name="date"
