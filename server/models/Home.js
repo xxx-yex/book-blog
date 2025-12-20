@@ -1,8 +1,8 @@
 const mongoose = require('mongoose');
 
 const HomeSchema = new mongoose.Schema({
-  name: { type: String, default: 'ObjectX-不知名程序员' },
-  subtitle: { type: String, default: '前端 & AI & 编辑器' },
+  name: { type: String, default: '' },
+  subtitle: { type: String, default: '' },
   introduction: { type: String, default: '' },
   avatarImage: { type: String }, // 头像URL
   bannerImage: { type: String }, // Banner背景图URL
@@ -26,8 +26,8 @@ const HomeSchema = new mongoose.Schema({
     followers: { type: Number, default: 3 }
   },
   siteInfo: {
-    runningTime: { type: String, default: '381天13时37分' },
-    icp: { type: String, default: '京ICP备2023017462号' }
+    runningTime: { type: String, default: '' },
+    icp: { type: String, default: '' }
   },
   updatedAt: { type: Date, default: Date.now }
 });
