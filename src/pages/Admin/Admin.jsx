@@ -11,26 +11,23 @@ import {
   message, 
   Popconfirm,
   Card,
-  Tabs,
   Upload
 } from 'antd';
 import { 
   PlusOutlined, 
   EditOutlined, 
   DeleteOutlined, 
-  FileTextOutlined,
   ExportOutlined,
   ImportOutlined,
-  PictureOutlined,
   UploadOutlined,
   LinkOutlined
 } from '@ant-design/icons';
-import { categoryAPI, articleAPI, photoAPI, bookmarkAPI, homeAPI } from '../../utils/api';
+import { categoryAPI, articleAPI, photoAPI, bookmarkAPI, homeAPI, eventAPI } from '../../utils/api';
 import { isAuthenticated } from '../../utils/auth';
 
 const Admin = () => {
   const navigate = useNavigate();
-  const [searchParams, setSearchParams] = useSearchParams();
+  const [searchParams] = useSearchParams();
   const [categories, setCategories] = useState([]);
   const [articles, setArticles] = useState([]);
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
@@ -49,6 +46,11 @@ const Admin = () => {
   const [bookmarkModalOpen, setBookmarkModalOpen] = useState(false);
   const [editingBookmark, setEditingBookmark] = useState(null);
   const [bookmarkForm] = Form.useForm();
+  const [events, setEvents] = useState([]);
+  const [eventModalOpen, setEventModalOpen] = useState(false);
+  const [editingEvent, setEditingEvent] = useState(null);
+  const [eventForm] = Form.useForm();
+  const [selectedEventIds, setSelectedEventIds] = useState([]);
   
   // 从 URL 参数或 localStorage 获取当前选中的标签
   const activeTab = searchParams.get('tab') || localStorage.getItem('adminActiveTab') || 'categories';
@@ -65,11 +67,12 @@ const Admin = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [categoriesData, articlesData, photosData, bookmarksData] = await Promise.all([
+      const [categoriesData, articlesData, photosData, bookmarksData, eventsData] = await Promise.all([
         categoryAPI.getAll(),
         articleAPI.getAll(),
         photoAPI.getAll(),
         bookmarkAPI.getAll(),
+        eventAPI.getAll(),
       ]);
       setCategories(categoriesData);
       setArticles(articlesData);
@@ -77,6 +80,7 @@ const Admin = () => {
       // 将书签对象转换为数组
       const bookmarksArray = Object.values(bookmarksData).flat();
       setBookmarks(bookmarksArray);
+      setEvents(eventsData);
     } catch (error) {
       message.error('加载数据失败');
     } finally {
@@ -392,7 +396,7 @@ const Admin = () => {
 
             // 导入书签
             if (bookmarks && typeof bookmarks === 'object') {
-              for (const [category, items] of Object.entries(bookmarks)) {
+              for (const [, items] of Object.entries(bookmarks)) {
                 if (Array.isArray(items)) {
                   for (const bookmark of items) {
                     try {
@@ -564,6 +568,67 @@ const Admin = () => {
     } catch (error) {
       message.error(error.response?.data?.message || '删除失败');
     }
+  };
+
+  // 时间事件相关函数
+  const handleEventSubmit = async (values) => {
+    try {
+      if (editingEvent) {
+        await eventAPI.update(editingEvent._id, values);
+        message.success('时间事件更新成功');
+      } else {
+        await eventAPI.create(values);
+        message.success('时间事件创建成功');
+      }
+      setEventModalOpen(false);
+      setEditingEvent(null);
+      eventForm.resetFields();
+      loadData();
+    } catch (error) {
+      message.error(error.response?.data?.message || '操作失败');
+    }
+  };
+
+  const handleEventEdit = (record) => {
+    setEditingEvent(record);
+    eventForm.setFieldsValue({
+      title: record.title,
+      description: record.description,
+      date: record.date ? new Date(record.date).toISOString().split('T')[0] : '',
+    });
+    setEventModalOpen(true);
+  };
+
+  const handleEventDelete = async (id) => {
+    try {
+      await eventAPI.delete(id);
+      message.success('删除成功');
+      loadData();
+    } catch (error) {
+      message.error(error.response?.data?.message || '删除失败');
+    }
+  };
+
+  const handleBatchEventDelete = async () => {
+    if (selectedEventIds.length === 0) {
+      message.warning('请先选择要删除的时间事件');
+      return;
+    }
+
+    Modal.confirm({
+      title: '确认批量删除',
+      content: `确定要删除选中的 ${selectedEventIds.length} 个时间事件吗？此操作不可恢复。`,
+      onOk: async () => {
+        try {
+          await eventAPI.batchDelete(selectedEventIds);
+          message.success(`成功删除 ${selectedEventIds.length} 个时间事件`);
+          setSelectedEventIds([]);
+          loadData();
+        } catch (error) {
+          message.error(error.response?.data?.message || '批量删除失败');
+        }
+      },
+    });
   };
 
   const categoryColumns = [
@@ -985,6 +1050,101 @@ const Admin = () => {
       ),
     },
     {
+      key: 'events',
+      label: '时间事件管理',
+      children: (
+        <Card>
+          <div className="mb-4 flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-black">时间事件列表</h2>
+            <Space>
+              {selectedEventIds.length > 0 && (
+                <Button 
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={handleBatchEventDelete}
+                >
+                  批量删除 ({selectedEventIds.length})
+                </Button>
+              )}
+              <Button 
+                className="bg-gray-800 text-white hover:bg-gray-700 border-none"
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  setEditingEvent(null);
+                  eventForm.resetFields();
+                  setEventModalOpen(true);
+                }}
+              >
+                新增时间事件
+              </Button>
+            </Space>
+          </div>
+          <Table
+            columns={[
+              {
+                title: '标题',
+                dataIndex: 'title',
+                key: 'title',
+              },
+              {
+                title: '描述',
+                dataIndex: 'description',
+                key: 'description',
+                ellipsis: true,
+                render: (text) => text || '-',
+              },
+              {
+                title: '日期',
+                dataIndex: 'date',
+                key: 'date',
+                sorter: (a, b) => new Date(a.date) - new Date(b.date),
+                render: (date) => date ? new Date(date).toLocaleDateString('zh-CN') : '-',
+              },
+              {
+                title: '创建时间',
+                dataIndex: 'createdAt',
+                key: 'createdAt',
+                render: (date) => new Date(date).toLocaleString('zh-CN'),
+              },
+              {
+                title: '操作',
+                key: 'action',
+                render: (_, record) => (
+                  <Space>
+                    <Button 
+                      type="link" 
+                      icon={<EditOutlined />}
+                      onClick={() => handleEventEdit(record)}
+                    >
+                      编辑
+                    </Button>
+                    <Popconfirm
+                      title="确定要删除这个时间事件吗？"
+                      onConfirm={() => handleEventDelete(record._id)}
+                    >
+                      <Button type="link" danger icon={<DeleteOutlined />}>
+                        删除
+                      </Button>
+                    </Popconfirm>
+                  </Space>
+                ),
+              },
+            ]}
+            dataSource={events}
+            rowKey="_id"
+            loading={loading}
+            pagination={{ pageSize: 10 }}
+            rowSelection={{
+              selectedRowKeys: selectedEventIds,
+              onChange: (selectedRowKeys) => {
+                setSelectedEventIds(selectedRowKeys);
+              },
+            }}
+          />
+        </Card>
+      ),
+    },
+    {
       key: 'data',
       label: '数据管理',
       children: (
@@ -1229,6 +1389,62 @@ const Admin = () => {
                 <Button onClick={() => {
                   setBookmarkModalOpen(false);
                   bookmarkForm.resetFields();
+                }}>
+                  取消
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        </Modal>
+
+        {/* 时间事件编辑弹窗 */}
+        <Modal
+          title={editingEvent ? '编辑时间事件' : '新增时间事件'}
+          open={eventModalOpen}
+          onCancel={() => {
+            setEventModalOpen(false);
+            setEditingEvent(null);
+            eventForm.resetFields();
+          }}
+          footer={null}
+        >
+          <Form
+            form={eventForm}
+            layout="vertical"
+            onFinish={handleEventSubmit}
+            className="mt-4"
+          >
+            <Form.Item
+              name="title"
+              label="标题"
+              rules={[{ required: true, message: '请输入标题' }]}
+            >
+              <Input placeholder="请输入时间事件标题" />
+            </Form.Item>
+            <Form.Item
+              name="description"
+              label="描述"
+            >
+              <Input.TextArea rows={4} placeholder="请输入时间事件描述（可选）" />
+            </Form.Item>
+            <Form.Item
+              name="date"
+              label="日期"
+              rules={[{ required: true, message: '请选择日期' }]}
+            >
+              <Input type="date" />
+            </Form.Item>
+            <Form.Item>
+              <Space>
+                <Button 
+                  className="bg-gray-800 text-white hover:bg-gray-700 border-none"
+                  htmlType="submit"
+                >
+                  {editingEvent ? '更新' : '创建'}
+                </Button>
+                <Button onClick={() => {
+                  setEventModalOpen(false);
+                  eventForm.resetFields();
                 }}>
                   取消
                 </Button>

@@ -2,7 +2,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { Input, Button, message, Avatar, Dropdown } from 'antd';
-import { UserOutlined, LogoutOutlined, CloseOutlined, MenuOutlined } from '@ant-design/icons';
+import { UserOutlined, LogoutOutlined, CloseOutlined } from '@ant-design/icons';
 import { 
   BookOutlined, 
   CameraOutlined, 
@@ -192,9 +192,6 @@ const Sidebar = () => {
     return location.pathname.startsWith(item.path);
   };
 
-  // 判断是否在首页
-  const isHomeActive = location.pathname === '/' || (location.pathname === '/home');
-
   const handleMenuClick = (item) => {
     navigate(item.path);
     // 移动端点击菜单后关闭侧边栏
@@ -210,6 +207,7 @@ const Sidebar = () => {
       { key: 'articles', label: '文章管理' },
       { key: 'photos', label: '相册管理' },
       { key: 'bookmarks', label: '导航管理' },
+      { key: 'events', label: '时间事件管理' },
       { key: 'data', label: '数据管理' },
       { key: 'password', label: '修改密码' },
     ];

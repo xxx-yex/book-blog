@@ -104,5 +104,15 @@ export const bookmarkAPI = {
   delete: (id) => api.delete(`/bookmarks/${id}`),
 };
 
+// 时间事件相关
+export const eventAPI = {
+  getAll: () => api.get('/events'),
+  getById: (id) => api.get(`/events/${id}`),
+  create: (data) => api.post('/events', data),
+  update: (id, data) => api.put(`/events/${id}`, data),
+  delete: (id) => api.delete(`/events/${id}`),
+  batchDelete: (ids) => api.post('/events/batch-delete', { ids }),
+};
+
 export default api;
 

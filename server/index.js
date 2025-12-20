@@ -29,6 +29,7 @@ app.use('/api/articles', require('./routes/articles'));
 app.use('/api/photos', require('./routes/photos'));
 app.use('/api/home', require('./routes/home'));
 app.use('/api/bookmarks', require('./routes/bookmarks'));
+app.use('/api/events', require('./routes/events'));
 
 // 健康检查
 app.get('/health', (req, res) => {
