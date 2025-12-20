@@ -1,0 +1,42 @@
+import { Routes, Route } from 'react-router-dom';
+import Layout from './components/Layout';
+import Home from './pages/Home';
+import ArticleDetail from './pages/ArticleDetail';
+import Admin from './pages/Admin/Admin';
+import ArticleEdit from './pages/Admin/ArticleEdit';
+import HomeEdit from './pages/Admin/HomeEdit';
+import Articles from './pages/Articles';
+import Album from './pages/Album';
+import Travel from './pages/Travel';
+import Nav from './pages/Nav';
+import Notes from './pages/Notes';
+import Projects from './pages/Projects';
+import { CategoryProvider } from './context/CategoryContext';
+import { SidebarProvider } from './context/SidebarContext';
+
+function App() {
+  return (
+    <CategoryProvider>
+      <SidebarProvider>
+        <Layout>
+        <Routes>
+          <Route path="/" element={<Home />} />
+          <Route path="/articles" element={<Articles />} />
+          <Route path="/article/:id" element={<ArticleDetail />} />
+          <Route path="/album" element={<Album />} />
+          <Route path="/travel" element={<Travel />} />
+          <Route path="/nav" element={<Nav />} />
+          <Route path="/notes" element={<Notes />} />
+          <Route path="/projects" element={<Projects />} />
+          <Route path="/admin" element={<Admin />} />
+          <Route path="/admin/article/:id?" element={<ArticleEdit />} />
+          <Route path="/admin/home" element={<HomeEdit />} />
+        </Routes>
+      </Layout>
+      </SidebarProvider>
+    </CategoryProvider>
+  );
+}
+
+export default App;
+

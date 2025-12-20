@@ -1,0 +1,76 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+:root {
+  --primary-100: #d4eaf7;
+  --primary-200: #b6ccd8;
+  --primary-300: #3b3c3d;
+  --accent-100: #71c4ef;
+  --accent-200: #00668c;
+  --text-100: #1d1c1c;
+  --text-200: #313d44;
+  --bg-100: #fffefb;
+  --bg-200: #f5f4f1;
+  --bg-300: #cccbc8;
+}
+
+body {
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
+    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  color: var(--text-100);
+  background-color: var(--bg-100);
+}
+
+/* 覆盖 Ant Design 默认主题色 */
+.ant-btn-primary {
+  background-color: var(--primary-300) !important;
+  border-color: var(--primary-300) !important;
+}
+
+.ant-btn-primary:hover {
+  background-color: var(--accent-200) !important;
+  border-color: var(--accent-200) !important;
+}
+
+.ant-tabs-tab.ant-tabs-tab-active .ant-tabs-tab-btn {
+  color: var(--text-100) !important;
+}
+
+.ant-tabs-ink-bar {
+  background-color: var(--primary-300) !important;
+}
+
+/* 头部下拉菜单样式 */
+.header-dropdown .ant-dropdown-menu {
+  padding: 0;
+  border-radius: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+}
+
+.header-dropdown .ant-dropdown-menu-item {
+  padding: 0;
+}
+
+.header-dropdown .ant-dropdown-menu-item:hover {
+  background-color: transparent;
+}
+
+/* Banner 背景放大动画 */
+@keyframes zoomIn {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.1);
+  }
+}
+
+.banner-bg-animated {
+  animation: zoomIn 20s ease-in-out infinite alternate;
+}
+

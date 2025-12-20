@@ -1,0 +1,1245 @@
+import { useState, useEffect } from 'react';
+import { useNavigate, useSearchParams } from 'react-router-dom';
+import { 
+  Table, 
+  Button, 
+  Space, 
+  Modal, 
+  Form, 
+  Input, 
+  InputNumber, 
+  message, 
+  Popconfirm,
+  Card,
+  Tabs,
+  Upload
+} from 'antd';
+import { 
+  PlusOutlined, 
+  EditOutlined, 
+  DeleteOutlined, 
+  FileTextOutlined,
+  ExportOutlined,
+  ImportOutlined,
+  PictureOutlined,
+  UploadOutlined,
+  LinkOutlined
+} from '@ant-design/icons';
+import { categoryAPI, articleAPI, photoAPI, bookmarkAPI, homeAPI } from '../../utils/api';
+import { isAuthenticated } from '../../utils/auth';
+
+const Admin = () => {
+  const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
+  const [categories, setCategories] = useState([]);
+  const [articles, setArticles] = useState([]);
+  const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [editingCategory, setEditingCategory] = useState(null);
+  const [categoryForm] = Form.useForm();
+  const [loading, setLoading] = useState(false);
+  const [selectedArticleIds, setSelectedArticleIds] = useState([]);
+  const [selectedCategoryIds, setSelectedCategoryIds] = useState([]);
+  const [photos, setPhotos] = useState([]);
+  const [selectedPhotoIds, setSelectedPhotoIds] = useState([]);
+  const [photoModalOpen, setPhotoModalOpen] = useState(false);
+  const [editingPhoto, setEditingPhoto] = useState(null);
+  const [photoForm] = Form.useForm();
+  const [uploading, setUploading] = useState(false);
+  const [bookmarks, setBookmarks] = useState([]);
+  const [bookmarkModalOpen, setBookmarkModalOpen] = useState(false);
+  const [editingBookmark, setEditingBookmark] = useState(null);
+  const [bookmarkForm] = Form.useForm();
+  
+  // 从 URL 参数或 localStorage 获取当前选中的标签
+  const activeTab = searchParams.get('tab') || localStorage.getItem('adminActiveTab') || 'categories';
+
+  useEffect(() => {
+    if (!isAuthenticated()) {
+      navigate('/');
+      message.warning('请先登录');
+      return;
+    }
+    loadData();
+  }, []);
+
+  const loadData = async () => {
+    setLoading(true);
+    try {
+      const [categoriesData, articlesData, photosData, bookmarksData] = await Promise.all([
+        categoryAPI.getAll(),
+        articleAPI.getAll(),
+        photoAPI.getAll(),
+        bookmarkAPI.getAll(),
+      ]);
+      setCategories(categoriesData);
+      setArticles(articlesData);
+      setPhotos(photosData);
+      // 将书签对象转换为数组
+      const bookmarksArray = Object.values(bookmarksData).flat();
+      setBookmarks(bookmarksArray);
+    } catch (error) {
+      message.error('加载数据失败');
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const handleCategorySubmit = async (values) => {
+    try {
+      if (editingCategory) {
+        await categoryAPI.update(editingCategory._id, values);
+        message.success('分类更新成功');
+      } else {
+        await categoryAPI.create(values);
+        message.success('分类创建成功');
+      }
+      setCategoryModalOpen(false);
+      setEditingCategory(null);
+      categoryForm.resetFields();
+      loadData();
+    } catch (error) {
+      message.error(error.response?.data?.message || '操作失败');
+    }
+  };
+
+  const handleCategoryEdit = (record) => {
+    setEditingCategory(record);
+    categoryForm.setFieldsValue(record);
+    setCategoryModalOpen(true);
+  };
+
+  const handleCategoryDelete = async (id) => {
+    try {
+      await categoryAPI.delete(id);
+      message.success('删除成功');
+      loadData();
+    } catch (error) {
+      message.error(error.response?.data?.message || '删除失败');
+    }
+  };
+
+  const handleBatchCategoryDelete = async () => {
+    if (selectedCategoryIds.length === 0) {
+      message.warning('请先选择要删除的分类');
+      return;
+    }
+
+    Modal.confirm({
+      title: '确认批量删除',
+      content: `确定要删除选中的 ${selectedCategoryIds.length} 个分类吗？此操作不可恢复，且会删除该分类下的所有文章。`,
+      onOk: async () => {
+        try {
+          await categoryAPI.batchDelete(selectedCategoryIds);
+          message.success(`成功删除 ${selectedCategoryIds.length} 个分类`);
+          setSelectedCategoryIds([]);
+          loadData();
+        } catch (error) {
+          message.error(error.response?.data?.message || '批量删除失败');
+        }
+      },
+    });
+  };
+
+  const handleArticleDelete = async (id) => {
+    try {
+      await articleAPI.delete(id);
+      message.success('删除成功');
+      loadData();
+    } catch (error) {
+      message.error(error.response?.data?.message || '删除失败');
+    }
+  };
+
+  const handleBatchDelete = async () => {
+    if (selectedArticleIds.length === 0) {
+      message.warning('请先选择要删除的文章');
+      return;
+    }
+
+    Modal.confirm({
+      title: '确认批量删除',
+      content: `确定要删除选中的 ${selectedArticleIds.length} 篇文章吗？此操作不可恢复。`,
+      onOk: async () => {
+        try {
+          await articleAPI.batchDelete(selectedArticleIds);
+          message.success(`成功删除 ${selectedArticleIds.length} 篇文章`);
+          setSelectedArticleIds([]);
+          loadData();
+        } catch (error) {
+          message.error(error.response?.data?.message || '批量删除失败');
+        }
+      },
+    });
+  };
+
+  const handleExport = () => {
+    if (articles.length === 0) {
+      message.warning('没有可导出的文章');
+      return;
+    }
+
+    // 准备导出数据
+    const exportData = articles.map(article => ({
+      title: article.title,
+      content: article.content,
+      category: article.category?._id || null,
+      tags: article.tags || [],
+      views: article.views || 0,
+      likes: article.likes || 0,
+      createdAt: article.createdAt,
+      updatedAt: article.updatedAt,
+    }));
+
+    // 创建 JSON 文件并下载
+    const dataStr = JSON.stringify(exportData, null, 2);
+    const dataBlob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(dataBlob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `articles_export_${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+
+    message.success('导出成功');
+  };
+
+  const handleImport = async (file) => {
+    try {
+      const text = await file.text();
+      const importData = JSON.parse(text);
+
+      if (!Array.isArray(importData)) {
+        message.error('导入文件格式错误：必须是文章数组');
+        return false;
+      }
+
+      if (importData.length === 0) {
+        message.error('导入文件为空');
+        return false;
+      }
+
+      Modal.confirm({
+        title: '确认导入',
+        content: `确定要导入 ${importData.length} 篇文章吗？`,
+        onOk: async () => {
+          try {
+            const result = await articleAPI.batchImport(importData);
+            message.success(
+              `导入完成：成功 ${result.importedCount} 篇，失败 ${result.errorCount} 篇`
+            );
+            if (result.errors && result.errors.length > 0) {
+              console.error('导入错误:', result.errors);
+            }
+            setSelectedArticleIds([]);
+            loadData();
+          } catch (error) {
+            message.error(error.response?.data?.message || '导入失败');
+          }
+        },
+      });
+
+      return false; // 阻止默认上传行为
+    } catch (error) {
+      message.error('读取文件失败：' + error.message);
+      return false;
+    }
+  };
+
+  // 导出所有数据
+  const handleExportAllData = async () => {
+    try {
+      setLoading(true);
+      
+      // 获取所有数据
+      const [categoriesData, articlesData, photosData, bookmarksData, homeData] = await Promise.all([
+        categoryAPI.getAll(),
+        articleAPI.getAll(),
+        photoAPI.getAll(),
+        bookmarkAPI.getAll(),
+        homeAPI.get(),
+      ]);
+
+      // 构建导出数据对象（包含元数据）
+      const exportData = {
+        version: '1.0.0',
+        exportDate: new Date().toISOString(),
+        description: '网站完整数据导出',
+        data: {
+          categories: categoriesData || [],
+          articles: articlesData || [],
+          photos: photosData || [],
+          bookmarks: bookmarksData || {},
+          home: homeData || {},
+        },
+      };
+
+      // 创建 JSON 文件并下载
+      const dataStr = JSON.stringify(exportData, null, 2);
+      const dataBlob = new Blob([dataStr], { type: 'application/json' });
+      const url = URL.createObjectURL(dataBlob);
+      const link = document.createElement('a');
+      link.href = url;
+      const dateStr = new Date().toISOString().split('T')[0];
+      link.download = `website_backup_${dateStr}.json`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      URL.revokeObjectURL(url);
+
+      message.success('数据导出成功');
+    } catch (error) {
+      console.error('导出失败:', error);
+      message.error('导出失败：' + (error.response?.data?.message || error.message));
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 导入所有数据
+  const handleImportAllData = async (file) => {
+    try {
+      const text = await file.text();
+      const importData = JSON.parse(text);
+
+      // 验证数据格式
+      if (!importData.data || typeof importData.data !== 'object') {
+        message.error('导入文件格式错误：缺少 data 字段');
+        return false;
+      }
+
+      const { categories, articles, photos, bookmarks, home } = importData.data;
+
+      // 统计数据量
+      const stats = {
+        categories: Array.isArray(categories) ? categories.length : 0,
+        articles: Array.isArray(articles) ? articles.length : 0,
+        photos: Array.isArray(photos) ? photos.length : 0,
+        bookmarks: bookmarks ? Object.keys(bookmarks).reduce((sum, key) => sum + (bookmarks[key]?.length || 0), 0) : 0,
+        home: home ? 1 : 0,
+      };
+
+      const totalItems = stats.categories + stats.articles + stats.photos + stats.bookmarks + stats.home;
+
+      if (totalItems === 0) {
+        message.error('导入文件为空');
+        return false;
+      }
+
+      Modal.confirm({
+        title: '确认导入数据',
+        content: (
+          <div className="py-2">
+            <p className="mb-2">确定要导入以下数据吗？</p>
+            <ul className="list-disc list-inside text-sm space-y-1">
+              {stats.categories > 0 && <li>分类：{stats.categories} 个</li>}
+              {stats.articles > 0 && <li>文章：{stats.articles} 篇</li>}
+              {stats.photos > 0 && <li>相册：{stats.photos} 张</li>}
+              {stats.bookmarks > 0 && <li>书签：{stats.bookmarks} 个</li>}
+              {stats.home > 0 && <li>首页配置：1 个</li>}
+            </ul>
+            <p className="mt-3 text-red-600 text-sm font-semibold">
+              警告：导入会覆盖现有数据，请确保已备份！
+            </p>
+          </div>
+        ),
+        okText: '确认导入',
+        cancelText: '取消',
+        okButtonProps: { danger: true },
+        onOk: async () => {
+          try {
+            setLoading(true);
+            const results = {
+              categories: { success: 0, failed: 0 },
+              articles: { success: 0, failed: 0 },
+              photos: { success: 0, failed: 0 },
+              bookmarks: { success: 0, failed: 0 },
+              home: { success: 0, failed: 0 },
+            };
+
+            // 导入分类
+            if (Array.isArray(categories) && categories.length > 0) {
+              for (const category of categories) {
+                try {
+                  await categoryAPI.create(category);
+                  results.categories.success++;
+                } catch (error) {
+                  results.categories.failed++;
+                  console.error('导入分类失败:', category, error);
+                }
+              }
+            }
+
+            // 导入文章
+            if (Array.isArray(articles) && articles.length > 0) {
+              try {
+                const result = await articleAPI.batchImport(articles);
+                results.articles.success = result.importedCount || 0;
+                results.articles.failed = result.errorCount || 0;
+              } catch (error) {
+                results.articles.failed = articles.length;
+                console.error('导入文章失败:', error);
+              }
+            }
+
+            // 导入相册（注意：相册需要上传图片文件，这里只导入元数据）
+            if (Array.isArray(photos) && photos.length > 0) {
+              message.warning('相册数据导入功能需要图片文件，当前仅支持元数据导入');
+              // 暂时跳过相册导入，因为需要图片文件
+              results.photos.failed = photos.length;
+            }
+
+            // 导入书签
+            if (bookmarks && typeof bookmarks === 'object') {
+              for (const [category, items] of Object.entries(bookmarks)) {
+                if (Array.isArray(items)) {
+                  for (const bookmark of items) {
+                    try {
+                      await bookmarkAPI.create(bookmark);
+                      results.bookmarks.success++;
+                    } catch (error) {
+                      results.bookmarks.failed++;
+                      console.error('导入书签失败:', bookmark, error);
+                    }
+                  }
+                }
+              }
+            }
+
+            // 导入首页配置
+            if (home) {
+              try {
+                const formData = new FormData();
+                formData.append('name', home.name || '');
+                formData.append('subtitle', home.subtitle || '');
+                formData.append('introduction', home.introduction || '');
+                formData.append('socialLinks', JSON.stringify(home.socialLinks || []));
+                formData.append('education', JSON.stringify(home.education || []));
+                formData.append('work', JSON.stringify(home.work || []));
+                formData.append('stats', JSON.stringify(home.stats || {}));
+                formData.append('siteInfo', JSON.stringify(home.siteInfo || {}));
+                await homeAPI.update(formData);
+                results.home.success = 1;
+              } catch (error) {
+                results.home.failed = 1;
+                console.error('导入首页配置失败:', error);
+              }
+            }
+
+            // 显示导入结果
+            const successTotal = Object.values(results).reduce((sum, r) => sum + r.success, 0);
+            const failedTotal = Object.values(results).reduce((sum, r) => sum + r.failed, 0);
+            
+            message.success(
+              `导入完成：成功 ${successTotal} 项，失败 ${failedTotal} 项`
+            );
+
+            // 重新加载数据
+            loadData();
+          } catch (error) {
+            message.error('导入失败：' + (error.response?.data?.message || error.message));
+          } finally {
+            setLoading(false);
+          }
+        },
+      });
+
+      return false; // 阻止默认上传行为
+    } catch (error) {
+      message.error('读取文件失败：' + error.message);
+      return false;
+    }
+  };
+
+  const handlePhotoUpload = async (file) => {
+    setUploading(true);
+    try {
+      const formData = new FormData();
+      formData.append('photo', file);
+      formData.append('title', file.name);
+      
+      await photoAPI.upload(formData);
+      message.success('照片上传成功');
+      loadData();
+    } catch (error) {
+      message.error(error.response?.data?.message || '上传失败');
+    } finally {
+      setUploading(false);
+    }
+    return false; // 阻止默认上传行为
+  };
+
+  const handlePhotoEdit = (record) => {
+    setEditingPhoto(record);
+    photoForm.setFieldsValue({
+      title: record.title,
+      description: record.description,
+      tags: record.tags?.join(',') || '',
+    });
+    setPhotoModalOpen(true);
+  };
+
+  const handlePhotoSubmit = async (values) => {
+    try {
+      const { tags, ...rest } = values;
+      const photoData = {
+        ...rest,
+        tags: tags ? tags.split(',').map(t => t.trim()).filter(t => t) : [],
+      };
+      
+      await photoAPI.update(editingPhoto._id, photoData);
+      message.success('照片信息更新成功');
+      setPhotoModalOpen(false);
+      setEditingPhoto(null);
+      photoForm.resetFields();
+      loadData();
+    } catch (error) {
+      message.error(error.response?.data?.message || '更新失败');
+    }
+  };
+
+  const handlePhotoDelete = async (id) => {
+    try {
+      await photoAPI.delete(id);
+      message.success('删除成功');
+      loadData();
+    } catch (error) {
+      message.error(error.response?.data?.message || '删除失败');
+    }
+  };
+
+  const handleBatchPhotoDelete = async () => {
+    if (selectedPhotoIds.length === 0) {
+      message.warning('请先选择要删除的照片');
+      return;
+    }
+
+    Modal.confirm({
+      title: '确认批量删除',
+      content: `确定要删除选中的 ${selectedPhotoIds.length} 张照片吗？此操作不可恢复。`,
+      onOk: async () => {
+        try {
+          await photoAPI.batchDelete(selectedPhotoIds);
+          message.success(`成功删除 ${selectedPhotoIds.length} 张照片`);
+          setSelectedPhotoIds([]);
+          loadData();
+        } catch (error) {
+          message.error(error.response?.data?.message || '批量删除失败');
+        }
+      },
+    });
+  };
+
+  // 书签相关函数
+  const handleBookmarkSubmit = async (values) => {
+    try {
+      if (editingBookmark) {
+        await bookmarkAPI.update(editingBookmark._id, values);
+        message.success('书签更新成功');
+      } else {
+        await bookmarkAPI.create(values);
+        message.success('书签创建成功');
+      }
+      setBookmarkModalOpen(false);
+      setEditingBookmark(null);
+      bookmarkForm.resetFields();
+      loadData();
+    } catch (error) {
+      message.error(error.response?.data?.message || '操作失败');
+    }
+  };
+
+  const handleBookmarkEdit = (record) => {
+    setEditingBookmark(record);
+    bookmarkForm.setFieldsValue(record);
+    setBookmarkModalOpen(true);
+  };
+
+  const handleBookmarkDelete = async (id) => {
+    try {
+      await bookmarkAPI.delete(id);
+      message.success('删除成功');
+      loadData();
+    } catch (error) {
+      message.error(error.response?.data?.message || '删除失败');
+    }
+  };
+
+  const categoryColumns = [
+    {
+      title: '分类名称',
+      dataIndex: 'name',
+      key: 'name',
+    },
+    {
+      title: '图标',
+      dataIndex: 'icon',
+      key: 'icon',
+      render: (icon) => icon || '-',
+    },
+    {
+      title: '排序',
+      dataIndex: 'sortOrder',
+      key: 'sortOrder',
+      sorter: (a, b) => (a.sortOrder || 0) - (b.sortOrder || 0),
+    },
+    {
+      title: '操作',
+      key: 'action',
+      render: (_, record) => (
+        <Space>
+          <Button 
+            type="link" 
+            icon={<EditOutlined />}
+            onClick={() => handleCategoryEdit(record)}
+          >
+            编辑
+          </Button>
+          <Popconfirm
+            title="确定要删除这个分类吗？"
+            onConfirm={() => handleCategoryDelete(record._id)}
+          >
+            <Button type="link" danger icon={<DeleteOutlined />}>
+              删除
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
+  const articleColumns = [
+    {
+      title: '标题',
+      dataIndex: 'title',
+      key: 'title',
+    },
+    {
+      title: '分类',
+      dataIndex: ['category', 'name'],
+      key: 'category',
+      render: (name) => name || '-',
+    },
+    {
+      title: '浏览量',
+      dataIndex: 'views',
+      key: 'views',
+      sorter: (a, b) => (a.views || 0) - (b.views || 0),
+    },
+    {
+      title: '创建时间',
+      dataIndex: 'createdAt',
+      key: 'createdAt',
+      render: (date) => new Date(date).toLocaleString('zh-CN'),
+    },
+    {
+      title: '操作',
+      key: 'action',
+      render: (_, record) => (
+        <Space>
+          <Button 
+            type="link" 
+            icon={<EditOutlined />}
+            onClick={() => navigate(`/admin/article/${record._id}`)}
+          >
+            编辑
+          </Button>
+          <Popconfirm
+            title="确定要删除这篇文章吗？"
+            onConfirm={() => handleArticleDelete(record._id)}
+          >
+            <Button type="link" danger icon={<DeleteOutlined />}>
+              删除
+            </Button>
+          </Popconfirm>
+        </Space>
+      ),
+    },
+  ];
+
+  const tabItems = [
+    {
+      key: 'categories',
+      label: '分类管理',
+      children: (
+        <Card>
+          <div className="mb-4 flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-black">分类列表</h2>
+            <Space>
+              {selectedCategoryIds.length > 0 && (
+                <Button 
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={handleBatchCategoryDelete}
+                >
+                  批量删除 ({selectedCategoryIds.length})
+                </Button>
+              )}
+              <Button 
+                className="bg-gray-800 text-white hover:bg-gray-700 border-none"
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  setEditingCategory(null);
+                  categoryForm.resetFields();
+                  setCategoryModalOpen(true);
+                }}
+              >
+                新增分类
+              </Button>
+            </Space>
+          </div>
+          <Table
+            columns={categoryColumns}
+            dataSource={categories}
+            rowKey="_id"
+            loading={loading}
+            pagination={{ pageSize: 10 }}
+            rowSelection={{
+              selectedRowKeys: selectedCategoryIds,
+              onChange: (selectedRowKeys) => {
+                setSelectedCategoryIds(selectedRowKeys);
+              },
+            }}
+          />
+        </Card>
+      ),
+    },
+    {
+      key: 'articles',
+      label: '文章管理',
+      children: (
+        <Card>
+          <div className="mb-4 flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-black">文章列表</h2>
+            <Space>
+              {selectedArticleIds.length > 0 && (
+                <Button 
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={handleBatchDelete}
+                >
+                  批量删除 ({selectedArticleIds.length})
+                </Button>
+              )}
+              <Button 
+                icon={<ExportOutlined />}
+                onClick={handleExport}
+              >
+                导出
+              </Button>
+              <Upload
+                accept=".json"
+                beforeUpload={handleImport}
+                showUploadList={false}
+              >
+                <Button 
+                  icon={<ImportOutlined />}
+                >
+                  导入
+                </Button>
+              </Upload>
+              <Button 
+                className="bg-gray-800 text-white hover:bg-gray-700 border-none"
+                icon={<PlusOutlined />}
+                onClick={() => navigate('/admin/article')}
+              >
+                新增文章
+              </Button>
+            </Space>
+          </div>
+          <Table
+            columns={articleColumns}
+            dataSource={articles}
+            rowKey="_id"
+            loading={loading}
+            pagination={{ pageSize: 10 }}
+            rowSelection={{
+              selectedRowKeys: selectedArticleIds,
+              onChange: (selectedRowKeys) => {
+                setSelectedArticleIds(selectedRowKeys);
+              },
+            }}
+          />
+        </Card>
+      ),
+    },
+    {
+      key: 'photos',
+      label: '相册管理',
+      children: (
+        <Card>
+          <div className="mb-4 flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-black">照片列表</h2>
+            <Space>
+              {selectedPhotoIds.length > 0 && (
+                <Button 
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={handleBatchPhotoDelete}
+                >
+                  批量删除 ({selectedPhotoIds.length})
+                </Button>
+              )}
+              <Upload
+                accept="image/*"
+                beforeUpload={handlePhotoUpload}
+                showUploadList={false}
+                disabled={uploading}
+              >
+                <Button 
+                  className="bg-gray-800 text-white hover:bg-gray-700 border-none"
+                  icon={<UploadOutlined />}
+                  loading={uploading}
+                >
+                  上传照片
+                </Button>
+              </Upload>
+            </Space>
+          </div>
+          <Table
+            columns={[
+              {
+                title: '缩略图',
+                dataIndex: 'thumbnailUrl',
+                key: 'thumbnail',
+                width: 100,
+                render: (url, record) => (
+                  <img 
+                    src={`http://localhost:3001${url || record.url}`}
+                    alt={record.title}
+                    className="w-16 h-16 object-cover rounded"
+                    onError={(e) => {
+                      e.target.src = `http://localhost:3001${record.url}`;
+                    }}
+                  />
+                ),
+              },
+              {
+                title: '标题',
+                dataIndex: 'title',
+                key: 'title',
+              },
+              {
+                title: '描述',
+                dataIndex: 'description',
+                key: 'description',
+                ellipsis: true,
+              },
+              {
+                title: '标签',
+                dataIndex: 'tags',
+                key: 'tags',
+                render: (tags) => tags?.join(', ') || '-',
+              },
+              {
+                title: '创建时间',
+                dataIndex: 'createdAt',
+                key: 'createdAt',
+                render: (date) => new Date(date).toLocaleString('zh-CN'),
+              },
+              {
+                title: '操作',
+                key: 'action',
+                render: (_, record) => (
+                  <Space>
+                    <Button 
+                      type="link" 
+                      icon={<EditOutlined />}
+                      onClick={() => handlePhotoEdit(record)}
+                    >
+                      编辑
+                    </Button>
+                    <Popconfirm
+                      title="确定要删除这张照片吗？"
+                      onConfirm={() => handlePhotoDelete(record._id)}
+                    >
+                      <Button type="link" danger icon={<DeleteOutlined />}>
+                        删除
+                      </Button>
+                    </Popconfirm>
+                  </Space>
+                ),
+              },
+            ]}
+            dataSource={photos}
+            rowKey="_id"
+            loading={loading}
+            pagination={{ pageSize: 10 }}
+            rowSelection={{
+              selectedRowKeys: selectedPhotoIds,
+              onChange: (selectedRowKeys) => {
+                setSelectedPhotoIds(selectedRowKeys);
+              },
+            }}
+          />
+        </Card>
+      ),
+    },
+    {
+      key: 'bookmarks',
+      label: '导航管理',
+      children: (
+        <Card>
+          <div className="mb-4 flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-black">书签列表</h2>
+            <Button 
+              className="bg-gray-800 text-white hover:bg-gray-700 border-none"
+              icon={<PlusOutlined />}
+              onClick={() => {
+                setEditingBookmark(null);
+                bookmarkForm.resetFields();
+                setBookmarkModalOpen(true);
+              }}
+            >
+              新增书签
+            </Button>
+          </div>
+          <Table
+            columns={[
+              {
+                title: '图标',
+                dataIndex: 'icon',
+                key: 'icon',
+                width: 80,
+                render: (icon, record) => (
+                  icon ? (
+                    <img 
+                      src={icon}
+                      alt={record.title}
+                      className="w-8 h-8 rounded"
+                      onError={(e) => {
+                        e.target.style.display = 'none';
+                      }}
+                    />
+                  ) : (
+                    <div className="w-8 h-8 rounded bg-bg-200 flex items-center justify-center">
+                      <LinkOutlined className="text-text-200" />
+                    </div>
+                  )
+                ),
+              },
+              {
+                title: '标题',
+                dataIndex: 'title',
+                key: 'title',
+              },
+              {
+                title: '链接',
+                dataIndex: 'url',
+                key: 'url',
+                ellipsis: true,
+                render: (url) => (
+                  <a href={url} target="_blank" rel="noopener noreferrer" className="text-blue-500">
+                    {url}
+                  </a>
+                ),
+              },
+              {
+                title: '分类',
+                dataIndex: 'category',
+                key: 'category',
+              },
+              {
+                title: '描述',
+                dataIndex: 'description',
+                key: 'description',
+                ellipsis: true,
+              },
+              {
+                title: '排序',
+                dataIndex: 'order',
+                key: 'order',
+                width: 80,
+              },
+              {
+                title: '操作',
+                key: 'action',
+                render: (_, record) => (
+                  <Space>
+                    <Button 
+                      type="link" 
+                      icon={<EditOutlined />}
+                      onClick={() => handleBookmarkEdit(record)}
+                    >
+                      编辑
+                    </Button>
+                    <Popconfirm
+                      title="确定要删除这个书签吗？"
+                      onConfirm={() => handleBookmarkDelete(record._id)}
+                    >
+                      <Button type="link" danger icon={<DeleteOutlined />}>
+                        删除
+                      </Button>
+                    </Popconfirm>
+                  </Space>
+                ),
+              },
+            ]}
+            dataSource={bookmarks}
+            rowKey="_id"
+            loading={loading}
+            pagination={{ pageSize: 10 }}
+          />
+        </Card>
+      ),
+    },
+    {
+      key: 'data',
+      label: '数据管理',
+      children: (
+        <Card>
+          <div className="mb-6">
+            <h2 className="text-lg font-semibold text-black mb-4">数据导入/导出</h2>
+            <p className="text-text-200 mb-6">
+              您可以导出所有网站数据（分类、文章、相册、书签、首页配置）为 JSON 文件，也可以从 JSON 文件导入数据。
+            </p>
+            
+            <Space direction="vertical" size="large" className="w-full">
+              <div className="p-4 border border-bg-300 rounded-lg">
+                <h3 className="text-base font-semibold text-text-100 mb-2">导出数据</h3>
+                <p className="text-sm text-text-200 mb-4">
+                  导出所有数据为 JSON 格式文件，包含：分类、文章、相册、书签、首页配置
+                </p>
+                <Button
+                  className="bg-gray-800 text-white hover:bg-gray-700 border-none"
+                  icon={<ExportOutlined />}
+                  onClick={handleExportAllData}
+                  loading={loading}
+                >
+                  导出所有数据
+                </Button>
+              </div>
+
+              <div className="p-4 border border-bg-300 rounded-lg">
+                <h3 className="text-base font-semibold text-text-100 mb-2">导入数据</h3>
+                <p className="text-sm text-text-200 mb-4">
+                  从 JSON 文件导入数据。注意：导入会覆盖现有数据，请谨慎操作！
+                </p>
+                <Upload
+                  accept=".json"
+                  beforeUpload={handleImportAllData}
+                  showUploadList={false}
+                >
+                  <Button
+                    className="bg-gray-800 text-white hover:bg-gray-700 border-none"
+                    icon={<ImportOutlined />}
+                    loading={loading}
+                  >
+                    选择文件导入
+                  </Button>
+                </Upload>
+              </div>
+            </Space>
+          </div>
+        </Card>
+      ),
+    },
+  ];
+
+  // 根据当前选中的标签显示对应的内容
+  const getCurrentTabContent = () => {
+    const currentTab = tabItems.find(tab => tab.key === activeTab);
+    return currentTab ? currentTab.children : null;
+  };
+
+  return (
+    <div className="w-full h-full">
+      <div className="p-4 md:p-8 bg-white">
+        {getCurrentTabContent()}
+        
+        {/* 分类编辑弹窗 */}
+        <Modal
+          title={editingCategory ? '编辑分类' : '新增分类'}
+          open={categoryModalOpen}
+          onCancel={() => {
+            setCategoryModalOpen(false);
+            setEditingCategory(null);
+            categoryForm.resetFields();
+          }}
+          footer={null}
+        >
+          <Form
+            form={categoryForm}
+            layout="vertical"
+            onFinish={handleCategorySubmit}
+            className="mt-4"
+          >
+            <Form.Item
+              name="name"
+              label="分类名称"
+              rules={[{ required: true, message: '请输入分类名称' }]}
+            >
+              <Input placeholder="请输入分类名称" />
+            </Form.Item>
+            <Form.Item
+              name="icon"
+              label="图标"
+            >
+              <Input placeholder="图标（可选）" />
+            </Form.Item>
+            <Form.Item
+              name="sortOrder"
+              label="排序"
+              initialValue={0}
+            >
+              <InputNumber min={0} placeholder="排序值，数字越小越靠前" style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item>
+              <Space>
+                <Button 
+                  className="bg-gray-800 text-white hover:bg-gray-700 border-none"
+                  htmlType="submit"
+                >
+                  {editingCategory ? '更新' : '创建'}
+                </Button>
+                <Button onClick={() => {
+                  setCategoryModalOpen(false);
+                  categoryForm.resetFields();
+                }}>
+                  取消
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        </Modal>
+
+        {/* 照片编辑弹窗 */}
+        <Modal
+          title="编辑照片信息"
+          open={photoModalOpen}
+          onCancel={() => {
+            setPhotoModalOpen(false);
+            setEditingPhoto(null);
+            photoForm.resetFields();
+          }}
+          footer={null}
+        >
+          <Form
+            form={photoForm}
+            layout="vertical"
+            onFinish={handlePhotoSubmit}
+            className="mt-4"
+          >
+            <Form.Item
+              name="title"
+              label="标题"
+              rules={[{ required: true, message: '请输入标题' }]}
+            >
+              <Input placeholder="请输入照片标题" />
+            </Form.Item>
+            <Form.Item
+              name="description"
+              label="描述"
+            >
+              <Input.TextArea rows={4} placeholder="请输入照片描述（可选）" />
+            </Form.Item>
+            <Form.Item
+              name="tags"
+              label="标签"
+            >
+              <Input placeholder="请输入标签，用逗号分隔（可选）" />
+            </Form.Item>
+            <Form.Item>
+              <Space>
+                <Button 
+                  className="bg-gray-800 text-white hover:bg-gray-700 border-none"
+                  htmlType="submit"
+                >
+                  更新
+                </Button>
+                <Button onClick={() => {
+                  setPhotoModalOpen(false);
+                  photoForm.resetFields();
+                }}>
+                  取消
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        </Modal>
+
+        {/* 书签编辑弹窗 */}
+        <Modal
+          title={editingBookmark ? '编辑书签' : '新增书签'}
+          open={bookmarkModalOpen}
+          onCancel={() => {
+            setBookmarkModalOpen(false);
+            setEditingBookmark(null);
+            bookmarkForm.resetFields();
+          }}
+          footer={null}
+        >
+          <Form
+            form={bookmarkForm}
+            layout="vertical"
+            onFinish={handleBookmarkSubmit}
+            className="mt-4"
+          >
+            <Form.Item
+              name="title"
+              label="标题"
+              rules={[{ required: true, message: '请输入标题' }]}
+            >
+              <Input placeholder="请输入书签标题" />
+            </Form.Item>
+            <Form.Item
+              name="url"
+              label="链接"
+              rules={[
+                { required: true, message: '请输入链接' },
+                { type: 'url', message: '请输入有效的URL' }
+              ]}
+            >
+              <Input placeholder="https://example.com" />
+            </Form.Item>
+            <Form.Item
+              name="category"
+              label="分类"
+              rules={[{ required: true, message: '请输入分类' }]}
+            >
+              <Input placeholder="例如：前端框架、工具、设计等" />
+            </Form.Item>
+            <Form.Item
+              name="description"
+              label="描述"
+            >
+              <Input.TextArea rows={3} placeholder="请输入书签描述（可选）" />
+            </Form.Item>
+            <Form.Item
+              name="icon"
+              label="图标URL"
+            >
+              <Input placeholder="图标URL（可选，留空将自动获取网站图标）" />
+            </Form.Item>
+            <Form.Item
+              name="order"
+              label="排序"
+            >
+              <InputNumber min={0} placeholder="数字越小越靠前" />
+            </Form.Item>
+            <Form.Item>
+              <Space>
+                <Button 
+                  className="bg-gray-800 text-white hover:bg-gray-700 border-none"
+                  htmlType="submit"
+                >
+                  {editingBookmark ? '更新' : '创建'}
+                </Button>
+                <Button onClick={() => {
+                  setBookmarkModalOpen(false);
+                  bookmarkForm.resetFields();
+                }}>
+                  取消
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        </Modal>
+      </div>
+    </div>
+  );
+};
+
+export default Admin;
+

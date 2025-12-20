@@ -1,0 +1,61 @@
+const express = require('express');
+const jwt = require('jsonwebtoken');
+const User = require('../models/User');
+const { authMiddleware, JWT_SECRET } = require('../middleware/auth');
+
+const router = express.Router();
+
+// 登录
+router.post('/login', async (req, res) => {
+  try {
+    const { username, password } = req.body;
+
+    if (!username || !password) {
+      return res.status(400).json({ message: '用户名和密码不能为空' });
+    }
+
+    const user = await User.findOne({ username });
+    if (!user) {
+      return res.status(401).json({ message: '用户名或密码错误' });
+    }
+
+    const isPasswordValid = await user.comparePassword(password);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: '用户名或密码错误' });
+    }
+
+    const token = jwt.sign(
+      { userId: user._id, username: user.username },
+      JWT_SECRET,
+      { expiresIn: '7d' }
+    );
+
+    res.json({
+      token,
+      user: {
+        _id: user._id,
+        username: user.username,
+        avatar: user.avatar,
+        role: user.role,
+      },
+    });
+  } catch (error) {
+    console.error('登录错误:', error);
+    res.status(500).json({ message: '服务器错误' });
+  }
+});
+
+// 获取当前用户信息
+router.get('/me', authMiddleware, async (req, res) => {
+  res.json({
+    user: {
+      _id: req.user._id,
+      username: req.user.username,
+      avatar: req.user.avatar,
+      role: req.user.role,
+    },
+  });
+});
+
+module.exports = router;
+
