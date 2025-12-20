@@ -9,8 +9,7 @@ import {
   SendOutlined, 
   FolderOutlined, 
   ClockCircleOutlined, 
-  FolderOpenOutlined,
-  PictureOutlined
+  FolderOpenOutlined
 } from '@ant-design/icons';
 import { authAPI, homeAPI, articleAPI, photoAPI, bookmarkAPI, eventAPI } from '../utils/api';
 import { getToken, setToken, removeToken } from '../utils/auth';
@@ -230,7 +229,6 @@ const Sidebar = () => {
       { key: 'categories', label: '分类管理' },
       { key: 'articles', label: '文章管理' },
       { key: 'photos', label: '相册管理' },
-      { key: 'images', label: '图像管理', icon: PictureOutlined },
       { key: 'bookmarks', label: '导航管理' },
       { key: 'events', label: '时间事件管理' },
       { key: 'data', label: '数据管理' },

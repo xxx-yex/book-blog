@@ -70,9 +70,6 @@ export const articleAPI = {
       },
     });
   },
-  getImages: () => api.get('/articles/images/list'),
-  deleteImage: (filename) => api.delete(`/articles/images/${filename}`),
-  convertBase64Images: () => api.post('/articles/images/convert-base64'),
 };
 
 // 相册相关
