@@ -1,19 +1,21 @@
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { GithubOutlined, HeartOutlined, EyeOutlined, UserOutlined, TeamOutlined, LikeOutlined } from '@ant-design/icons';
-import { homeAPI, articleAPI } from '../utils/api';
+import { GithubOutlined, CameraOutlined, EyeOutlined, UserOutlined, LikeOutlined } from '@ant-design/icons';
+import { homeAPI, articleAPI, photoAPI } from '../utils/api';
 import { message } from 'antd';
 
 const Home = () => {
   const navigate = useNavigate();
   const [homeData, setHomeData] = useState(null);
   const [articles, setArticles] = useState([]);
+  const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [articlesLoading, setArticlesLoading] = useState(true);
 
   useEffect(() => {
     loadHomeData();
     loadArticles();
+    loadPhotos();
   }, []);
 
   const loadHomeData = async () => {
@@ -40,6 +42,15 @@ const Home = () => {
       message.error('加载文章列表失败');
     } finally {
       setArticlesLoading(false);
+    }
+  };
+
+  const loadPhotos = async () => {
+    try {
+      const data = await photoAPI.getAll();
+      setPhotos(data);
+    } catch (error) {
+      // 静默失败，不影响其他内容加载
     }
   };
 
@@ -163,39 +174,48 @@ const Home = () => {
           </div>
         )}
 
-        {/* 运行信息 */}
+        {/* 生活相册 */}
         <div className="mb-8">
-          <h2 className="text-lg font-semibold text-text-100 mb-4">运行信息</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <HeartOutlined className="text-red-500" />
-                <span className="text-sm text-text-200">喜欢</span>
-              </div>
-              <div className="text-2xl font-bold text-text-100">{homeData.stats?.likes || 166}</div>
-            </div>
-            <div className="bg-white rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <EyeOutlined className="text-blue-500" />
-                <span className="text-sm text-text-200">访问人数</span>
-              </div>
-              <div className="text-2xl font-bold text-text-100">{homeData.stats?.views || 4057}</div>
-            </div>
-            <div className="bg-white rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <UserOutlined className="text-green-500" />
-                <span className="text-sm text-text-200">在线人数</span>
-              </div>
-              <div className="text-2xl font-bold text-text-100">{homeData.stats?.online || 1}</div>
-            </div>
-            <div className="bg-white rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <TeamOutlined className="text-purple-500" />
-                <span className="text-sm text-text-200">关注我</span>
-              </div>
-              <div className="text-2xl font-bold text-text-100">{homeData.stats?.followers || 3}</div>
-            </div>
+          <div className="flex items-center justify-between mb-4">
+            <h2 className="text-lg font-semibold text-text-100 flex items-center gap-2">
+              <CameraOutlined />
+              生活相册
+            </h2>
+            {photos.length > 0 && (
+              <button
+                onClick={() => navigate('/album')}
+                className="text-sm text-text-200 hover:text-text-100 transition-colors"
+              >
+                查看更多 →
+              </button>
+            )}
           </div>
+          {photos.length > 0 ? (
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+              {photos.slice(0, 8).map((photo) => (
+                <div
+                  key={photo._id}
+                  className="group relative aspect-square overflow-hidden rounded-lg cursor-pointer bg-bg-200"
+                  onClick={() => navigate('/album')}
+                >
+                  <img
+                    src={`http://localhost:3001${photo.thumbnailUrl || photo.url}`}
+                    alt={photo.title}
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                    onError={(e) => {
+                      e.target.src = `http://localhost:3001${photo.url}`;
+                    }}
+                  />
+                  <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors"></div>
+                </div>
+              ))}
+            </div>
+          ) : (
+            <div className="text-center py-8 text-text-200 bg-white rounded-lg">
+              <CameraOutlined className="text-4xl mb-2 opacity-50" />
+              <p>暂无照片</p>
+            </div>
+          )}
         </div>
 
         {/* 教育经历 */}
