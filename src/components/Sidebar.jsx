@@ -211,16 +211,21 @@ const Sidebar = () => {
       { key: 'photos', label: '相册管理' },
       { key: 'bookmarks', label: '导航管理' },
       { key: 'data', label: '数据管理' },
+      { key: 'password', label: '修改密码' },
     ];
 
-    // 从 URL 参数或 localStorage 获取当前选中的标签（排除首页编辑页面）
-    const activeTab = location.pathname === '/admin/home' 
+    // 从 URL 参数或 localStorage 获取当前选中的标签（排除首页编辑页面和修改密码页面）
+    const activeTab = location.pathname === '/admin/home' || location.pathname === '/admin/password'
       ? null 
       : (searchParams.get('tab') || localStorage.getItem('adminActiveTab') || 'categories');
 
     const handleTabClick = (tabKey) => {
-      localStorage.setItem('adminActiveTab', tabKey);
-      navigate(`/admin?tab=${tabKey}`);
+      if (tabKey === 'password') {
+        navigate('/admin/password');
+      } else {
+        localStorage.setItem('adminActiveTab', tabKey);
+        navigate(`/admin?tab=${tabKey}`);
+      }
     };
 
     return (
@@ -259,8 +264,8 @@ const Sidebar = () => {
               </div>
             </Dropdown>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-text-100 truncate">{homeData?.name || 'ObjectX-不知名程序员'}</div>
-              <div className="text-xs text-text-200 truncate">{homeData?.subtitle || '前端 & AI & 编辑器'}</div>
+              <div className="text-sm font-semibold text-text-100 truncate">{homeData?.name}</div>
+              <div className="text-xs text-text-200 truncate">{homeData?.subtitle}</div>
             </div>
           </div>
         </div>
@@ -280,7 +285,8 @@ const Sidebar = () => {
               <span className="text-sm font-medium">首页编辑</span>
             </button>
             {adminTabs.map((tab) => {
-              const isActive = activeTab === tab.key && location.pathname !== '/admin/home';
+              const isActive = (tab.key === 'password' && location.pathname === '/admin/password') ||
+                               (activeTab === tab.key && location.pathname !== '/admin/home' && location.pathname !== '/admin/password');
               return (
                 <div
                   key={tab.key}
@@ -338,8 +344,8 @@ const Sidebar = () => {
               </div>
             </Dropdown>
             <div className="flex-1 min-w-0">
-              <div className="text-sm font-semibold text-text-100 truncate">{homeData?.name || 'ObjectX-不知名程序员'}</div>
-              <div className="text-xs text-text-200 truncate">{homeData?.subtitle || '前端 & AI & 编辑器'}</div>
+              <div className="text-sm font-semibold text-text-100 truncate">{homeData?.name}</div>
+              <div className="text-xs text-text-200 truncate">{homeData?.subtitle}</div>
             </div>
           </div>
         </div>

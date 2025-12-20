@@ -57,5 +57,41 @@ router.get('/me', authMiddleware, async (req, res) => {
   });
 });
 
+// 修改密码
+router.put('/change-password', authMiddleware, async (req, res) => {
+  try {
+    const { oldPassword, newPassword } = req.body;
+
+    if (!oldPassword || !newPassword) {
+      return res.status(400).json({ message: '当前密码和新密码不能为空' });
+    }
+
+    if (newPassword.length < 6) {
+      return res.status(400).json({ message: '新密码长度至少为6位' });
+    }
+
+    // 获取完整的用户信息（包含密码）
+    const user = await User.findById(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: '用户不存在' });
+    }
+
+    // 验证旧密码
+    const isPasswordValid = await user.comparePassword(oldPassword);
+    if (!isPasswordValid) {
+      return res.status(401).json({ message: '当前密码错误' });
+    }
+
+    // 更新密码（会触发pre('save')中间件自动加密）
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ message: '密码修改成功' });
+  } catch (error) {
+    console.error('修改密码错误:', error);
+    res.status(500).json({ message: '服务器错误' });
+  }
+});
+
 module.exports = router;
 

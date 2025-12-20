@@ -38,6 +38,7 @@ api.interceptors.response.use(
 export const authAPI = {
   login: (username, password) => api.post('/auth/login', { username, password }),
   getCurrentUser: () => api.get('/auth/me'),
+  changePassword: (oldPassword, newPassword) => api.put('/auth/change-password', { oldPassword, newPassword }),
 };
 
 // 分类相关

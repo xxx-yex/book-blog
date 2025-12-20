@@ -5,6 +5,7 @@ import ArticleDetail from './pages/ArticleDetail';
 import Admin from './pages/Admin/Admin';
 import ArticleEdit from './pages/Admin/ArticleEdit';
 import HomeEdit from './pages/Admin/HomeEdit';
+import PasswordChange from './pages/Admin/PasswordChange';
 import Articles from './pages/Articles';
 import Album from './pages/Album';
 import Travel from './pages/Travel';
@@ -31,6 +32,7 @@ function App() {
           <Route path="/admin" element={<Admin />} />
           <Route path="/admin/article/:id?" element={<ArticleEdit />} />
           <Route path="/admin/home" element={<HomeEdit />} />
+          <Route path="/admin/password" element={<PasswordChange />} />
         </Routes>
       </Layout>
       </SidebarProvider>
