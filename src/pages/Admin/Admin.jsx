@@ -26,6 +26,7 @@ import {
 import { categoryAPI, articleAPI, photoAPI, bookmarkAPI, homeAPI, eventAPI } from '../../utils/api';
 import { isAuthenticated } from '../../utils/auth';
 import LocationPicker from '../../components/LocationPicker';
+import { marked } from 'marked';
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -213,11 +214,53 @@ const Admin = () => {
 
   const handleImport = async (file) => {
     try {
+      const fileName = file.name || '';
+      const fileExtension = fileName.split('.').pop()?.toLowerCase();
       const text = await file.text();
-      const importData = JSON.parse(text);
 
-      if (!Array.isArray(importData)) {
-        message.error('导入文件格式错误：必须是文章数组');
+      let importData = [];
+
+      // 处理 Markdown 文件
+      if (fileExtension === 'md' || fileExtension === 'markdown') {
+        // 提取标题（从文件名或第一行 # 标题）
+        let title = fileName.replace(/\.(md|markdown)$/i, '').trim();
+        
+        // 尝试从内容第一行提取标题
+        const lines = text.split('\n');
+        const firstLine = lines[0]?.trim();
+        if (firstLine && firstLine.startsWith('#')) {
+          title = firstLine.replace(/^#+\s*/, '').trim();
+        }
+        
+        // 如果没有找到标题，使用文件名
+        if (!title) {
+          title = fileName.replace(/\.(md|markdown)$/i, '');
+        }
+
+        // 将 Markdown 转换为 HTML
+        const htmlContent = marked(text);
+
+        importData = [{
+          title: title || '未命名文章',
+          content: htmlContent,
+          tags: [],
+          views: 0,
+          likes: 0,
+        }];
+      } 
+      // 处理 JSON 文件
+      else if (fileExtension === 'json') {
+        const parsedData = JSON.parse(text);
+
+        if (!Array.isArray(parsedData)) {
+          message.error('导入文件格式错误：必须是文章数组');
+          return false;
+        }
+
+        importData = parsedData;
+      } 
+      else {
+        message.error('不支持的文件格式，请导入 .json 或 .md 文件');
         return false;
       }
 
@@ -867,7 +910,7 @@ const Admin = () => {
                 导出
               </Button>
               <Upload
-                accept=".json"
+                accept=".json,.md,.markdown"
                 beforeUpload={handleImport}
                 showUploadList={false}
               >

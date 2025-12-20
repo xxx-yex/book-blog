@@ -36,7 +36,7 @@ const ArticleDetail = () => {
 
   if (loading) {
     return (
-      <div className="w-full h-full bg-bg-200">
+      <div className="w-full h-full bg-bg-200 overflow-y-auto">
         <div className="max-w-4xl mx-auto p-4 md:p-8">
           <div className="bg-bg-100 rounded-xl shadow-sm border border-bg-300 p-6 md:p-10">
             <div className="h-10 w-3/4 bg-bg-300 rounded-lg mb-6 animate-pulse"></div>
@@ -54,7 +54,7 @@ const ArticleDetail = () => {
 
   if (!article) {
     return (
-      <div className="w-full h-full bg-bg-200">
+      <div className="w-full h-full bg-bg-200 overflow-y-auto">
         <div className="max-w-4xl mx-auto p-4 md:p-8">
           <div className="bg-bg-100 rounded-xl shadow-sm border border-bg-300 p-6 md:p-12 text-center">
             <div className="text-text-200 text-lg mb-2">文章不存在</div>
@@ -66,7 +66,7 @@ const ArticleDetail = () => {
   }
 
   return (
-    <div className="w-full h-full bg-bg-200">
+    <div className="w-full h-full bg-bg-200 overflow-y-auto">
       {/* 文章内容区 */}
       <div className="max-w-4xl mx-auto p-4 md:p-8">
         {/* 返回按钮 */}
