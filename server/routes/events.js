@@ -36,7 +36,7 @@ router.get('/:id', async (req, res) => {
 // 创建时间事件（需要认证）
 router.post('/', authMiddleware, async (req, res) => {
   try {
-    const { title, description, date } = req.body;
+    const { title, description, location, mood, date } = req.body;
 
     if (!title || !date) {
       return res.status(400).json({ message: '标题和日期不能为空' });
@@ -45,6 +45,8 @@ router.post('/', authMiddleware, async (req, res) => {
     const event = new Event({
       title,
       description: description || '',
+      location: location || '',
+      mood: mood || '',
       date: new Date(date),
     });
 
@@ -60,16 +62,30 @@ router.post('/', authMiddleware, async (req, res) => {
 // 更新时间事件（需要认证）
 router.put('/:id', authMiddleware, async (req, res) => {
   try {
-    const { title, description, date } = req.body;
+    const { title, description, location, mood, date } = req.body;
+    
+    const updateData = {
+      title, 
+      description: description !== undefined ? description : undefined,
+      location: location !== undefined ? location : undefined,
+      mood: mood !== undefined ? mood : undefined,
+      updatedAt: Date.now() 
+    };
+    
+    if (date) {
+      updateData.date = new Date(date);
+    }
+    
+    // 移除undefined字段
+    Object.keys(updateData).forEach(key => {
+      if (updateData[key] === undefined) {
+        delete updateData[key];
+      }
+    });
     
     const event = await Event.findByIdAndUpdate(
       req.params.id,
-      { 
-        title, 
-        description, 
-        date: date ? new Date(date) : undefined,
-        updatedAt: Date.now() 
-      },
+      updateData,
       { new: true, runValidators: true }
     );
 
