@@ -129,6 +129,9 @@ const Notes = () => {
                             const showMonth = isFirstDayInMonth;
                             if (isFirstDayInMonth) isFirstDayInMonth = false;
                             
+                            // 根据索引判断左右交替：偶数在右，奇数在左
+                            const isLeft = dayIndex % 2 === 1;
+                            
                             return (
                               <div key={`${year}-${month}-${day}`} className="relative flex items-center">
                                 {/* 日期圆圈 */}
@@ -147,14 +150,14 @@ const Notes = () => {
                                   </div>
                                 )}
                                 
-                                {/* 事件列表 */}
-                                <div className="flex-1 space-y-4 ml-2">
+                                {/* 事件列表 - 根据 isLeft 决定左右位置 */}
+                                <div className={`flex-1 space-y-4 ${isLeft ? 'mr-2 order-first' : 'ml-2'}`}>
                                   {dayEvents.map((event, eventIndex) => (
                                     <div
                                       key={event._id}
                                       className="group cursor-pointer transition-all duration-200"
                                     >
-                                      <div className="flex items-start justify-between gap-4">
+                                      <div className={`flex items-start justify-between gap-4 ${isLeft ? 'flex-row-reverse' : ''}`}>
                                         <div className="flex-1 min-w-0">
                                           {/* 主标题 */}
                                           <div className="text-base font-medium text-text-100 mb-1">

@@ -11,7 +11,7 @@ import {
   ClockCircleOutlined, 
   FolderOpenOutlined
 } from '@ant-design/icons';
-import { authAPI, homeAPI } from '../utils/api';
+import { authAPI, homeAPI, articleAPI, photoAPI, bookmarkAPI, eventAPI } from '../utils/api';
 import { getToken, setToken, removeToken } from '../utils/auth';
 import { useSidebar } from '../context/SidebarContext';
 
@@ -24,6 +24,12 @@ const Sidebar = () => {
   const [loginForm, setLoginForm] = useState({ username: '', password: '' });
   const [loading, setLoading] = useState(false);
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const [counts, setCounts] = useState({
+    articles: 0,
+    photos: 0,
+    bookmarks: 0,
+    events: 0,
+  });
   const { isOpen, close } = useSidebar();
 
   useEffect(() => {
@@ -46,6 +52,24 @@ const Sidebar = () => {
       .catch(() => {
         // 静默失败
       });
+    
+    // 加载各模块的数量
+    Promise.all([
+      articleAPI.getAll().then(data => data.length).catch(() => 0),
+      photoAPI.getAll().then(data => data.length).catch(() => 0),
+      bookmarkAPI.getAll().then(data => {
+        const bookmarksArray = Object.values(data).flat();
+        return bookmarksArray.length;
+      }).catch(() => 0),
+      eventAPI.getAll().then(data => data.length).catch(() => 0),
+    ]).then(([articlesCount, photosCount, bookmarksCount, eventsCount]) => {
+      setCounts({
+        articles: articlesCount,
+        photos: photosCount,
+        bookmarks: bookmarksCount,
+        events: eventsCount,
+      });
+    });
   }, []);
 
   const handleLogin = async (e) => {
@@ -176,12 +200,11 @@ const Sidebar = () => {
 
   // 导航菜单配置
   const menuItems = [
-    { id: 'articles', path: '/articles', label: '技术文章', icon: BookOutlined, number: '1' },
-    { id: 'album', path: '/album', label: '生活相册', icon: CameraOutlined, number: '2' },
-    { id: 'travel', path: '/travel', label: '旅行日记', icon: SendOutlined, number: '3' },
-    { id: 'nav', path: '/nav', label: '导航栏', icon: FolderOutlined, number: '4' },
-    { id: 'notes', path: '/notes', label: '时间事件', icon: ClockCircleOutlined, number: '5' },
-    { id: 'projects', path: '/projects', label: '项目', icon: FolderOpenOutlined, number: '6' },
+    { id: 'articles', path: '/articles', label: '技术文章', icon: BookOutlined, count: counts.articles },
+    { id: 'album', path: '/album', label: '生活相册', icon: CameraOutlined, count: counts.photos },
+    { id: 'travel', path: '/travel', label: '旅行日记', icon: SendOutlined, count: 0 },
+    { id: 'nav', path: '/nav', label: '导航栏', icon: FolderOutlined, count: counts.bookmarks },
+    { id: 'notes', path: '/notes', label: '时间事件', icon: ClockCircleOutlined, count: counts.events },
   ];
 
   // 判断当前路径是否匹配菜单项
@@ -391,7 +414,7 @@ const Sidebar = () => {
                   ? 'bg-white/20 text-text-100' 
                   : 'bg-bg-200 text-text-200'
               }`}>
-                {item.number}
+                {item.count || 0}
               </span>
             </div>
           );

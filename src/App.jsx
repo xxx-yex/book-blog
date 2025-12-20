@@ -11,7 +11,6 @@ import Album from './pages/Album';
 import Travel from './pages/Travel';
 import Nav from './pages/Nav';
 import Notes from './pages/Notes';
-import Projects from './pages/Projects';
 import { CategoryProvider } from './context/CategoryContext';
 import { SidebarProvider } from './context/SidebarContext';
 
@@ -28,7 +27,6 @@ function App() {
           <Route path="/travel" element={<Travel />} />
           <Route path="/nav" element={<Nav />} />
           <Route path="/notes" element={<Notes />} />
-          <Route path="/projects" element={<Projects />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="/admin/article/:id?" element={<ArticleEdit />} />
           <Route path="/admin/home" element={<HomeEdit />} />
