@@ -34,3 +34,20 @@ lerna-debug.log*
 *.sln
 *.sw?
 
+# Uploaded files and images
+server/uploads/
+uploads/
+*.jpg
+*.jpeg
+*.png
+*.gif
+*.webp
+*.svg
+*.bmp
+*.ico
+*.tiff
+*.tif
+*.heic
+*.heif
+*.avif
+
