@@ -50,7 +50,18 @@ router.get('/', async (req, res) => {
     const photos = await Photo.find()
       .sort({ createdAt: -1 });
     
-    res.json(photos);
+    // 过滤掉文件不存在的照片
+    const validPhotos = [];
+    for (const photo of photos) {
+      const filePath = path.join(__dirname, '..', photo.url);
+      if (fs.existsSync(filePath)) {
+        validPhotos.push(photo);
+      } else {
+        console.log(`照片文件不存在，已跳过: ${photo.url}`);
+      }
+    }
+    
+    res.json(validPhotos);
   } catch (error) {
     console.error('获取照片错误:', error);
     res.status(500).json({ message: '服务器错误' });

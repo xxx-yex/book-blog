@@ -23,7 +23,8 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response.data,
   (error) => {
-    if (error.response?.status === 401) {
+    // 如果是登录接口的401错误，不重定向，让登录组件自己处理
+    if (error.response?.status === 401 && !error.config?.url?.includes('/auth/login')) {
       localStorage.removeItem('token');
       // 避免在登录页面重定向
       if (!window.location.pathname.includes('/admin')) {
@@ -94,12 +95,13 @@ export const photoAPI = {
 export const homeAPI = {
   get: () => api.get('/home'),
   update: (formData) => {
+    // 使用 FormData 时，axios 会自动设置正确的 Content-Type（包括 boundary）
+    // 不需要手动设置 Content-Type
     const token = localStorage.getItem('token');
     return api.put('/home', formData, {
-      headers: {
-        'Content-Type': 'multipart/form-data',
-        Authorization: token ? `Bearer ${token}` : '',
-      },
+      headers: token ? {
+        Authorization: `Bearer ${token}`,
+      } : {},
     });
   },
 };

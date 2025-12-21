@@ -988,11 +988,11 @@ const Admin = () => {
                 width: 100,
                 render: (url, record) => (
                   <img 
-                    src={`http://localhost:3001${url || record.url}`}
+                    src={`${url || record.url}`}
                     alt={record.title}
                     className="w-16 h-16 object-cover rounded"
                     onError={(e) => {
-                      e.target.src = `http://localhost:3001${record.url}`;
+                      e.target.src = `${record.url}`;
                     }}
                   />
                 ),

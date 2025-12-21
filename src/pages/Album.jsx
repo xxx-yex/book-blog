@@ -2,6 +2,35 @@ import { useState, useEffect } from 'react';
 import { Modal, Image } from 'antd';
 import { photoAPI } from '../utils/api';
 import { message } from 'antd';
+import ImageWithFallback from '../components/ImageWithFallback';
+
+// 规范化图片 URL，确保是相对路径
+const normalizeImageUrl = (url) => {
+  if (!url) return '';
+  
+  const urlString = String(url).trim();
+  if (!urlString) return '';
+  
+  // 如果已经是相对路径（以 / 开头），直接返回
+  if (urlString.startsWith('/')) {
+    return urlString;
+  }
+  
+  // 如果是完整 URL（http:// 或 https://），提取路径部分
+  if (urlString.startsWith('http://') || urlString.startsWith('https://')) {
+    try {
+      const urlObj = new URL(urlString);
+      return urlObj.pathname + urlObj.search;
+    } catch (e) {
+      // 如果不是有效 URL，尝试手动提取路径
+      const match = urlString.match(/\/uploads\/[^\s]*/);
+      return match ? match[0] : urlString;
+    }
+  }
+  
+  // 如果既不是以 / 开头也不是 http，添加 /
+  return '/' + urlString;
+};
 
 const Album = () => {
   const [photos, setPhotos] = useState([]);
@@ -65,12 +94,19 @@ const Album = () => {
                 className="group relative aspect-square overflow-hidden rounded-lg cursor-pointer bg-bg-200"
                 onClick={() => handleImageClick(index)}
               >
-                <img
-                  src={`http://localhost:3001${photo.thumbnailUrl || photo.url}`}
+                <ImageWithFallback
+                  src={normalizeImageUrl(photo.thumbnailUrl || photo.url)}
                   alt={photo.title}
                   className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                  loading="lazy"
+                  decoding="async"
+                  timeout={3000}
                   onError={(e) => {
-                    e.target.src = `http://localhost:3001${photo.url}`;
+                    // 如果缩略图加载失败，尝试加载原图
+                    if (photo.thumbnailUrl && photo.url && e.target.src !== normalizeImageUrl(photo.url)) {
+                      e.target.src = normalizeImageUrl(photo.url);
+                      return;
+                    }
                   }}
                 />
                 <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors flex items-end">
@@ -103,7 +139,7 @@ const Album = () => {
           {photos.map((photo) => (
             <Image
               key={photo._id}
-              src={`http://localhost:3001${photo.url}`}
+              src={normalizeImageUrl(photo.url)}
               alt={photo.title}
               style={{ display: 'none' }}
             />

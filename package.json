@@ -9,7 +9,8 @@
     "preview": "vite preview",
     "server": "node server/index.js",
     "dev:server": "nodemon server/index.js",
-    "init": "node server/init.js"
+    "init": "node server/init.js",
+    "create-admin": "node server/create-admin.js"
   },
   "dependencies": {
     "@ant-design/icons-svg": "^4.4.2",

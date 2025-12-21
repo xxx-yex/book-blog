@@ -51,3 +51,9 @@ uploads/
 *.heif
 *.avif
 
+# Build and deployment packages
+book-blog-deploy-*/
+book-blog-deploy-*.zip
+dist/
+build/
+

@@ -1,0 +1,91 @@
+version: '3.8'
+
+services:
+  # MongoDB 数据库服务
+  mongodb:
+    image: mongo:latest
+    container_name: book-blog-mongodb
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_DATABASE: book-notes
+    volumes:
+      - mongodb_data:/data/db
+    networks:
+      - book-blog-network
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/book-notes --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # 后端 API 服务
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: book-blog-backend
+    restart: unless-stopped
+    ports:
+      - "44881:3001"
+    environment:
+      - NODE_ENV=production
+      - PORT=3001
+      - MONGODB_URI=mongodb://mongodb:27017/book-notes
+    volumes:
+      - /root/book-blog/uploads:/app/server/uploads
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - book-blog-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3001/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # 前端服务（Nginx）
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    container_name: book-blog-frontend
+    restart: unless-stopped
+    ports:
+      - "44880:80"
+    environment:
+      - VITE_API_URL=http://localhost:44881
+    depends_on:
+      - backend
+    networks:
+      - book-blog-network
+
+  # 数据库初始化服务（仅运行一次）
+  init-db:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    container_name: book-blog-init-db
+    environment:
+      - NODE_ENV=production
+      - MONGODB_URI=mongodb://mongodb:27017/book-notes
+    command: sh -c "sleep 3 && node server/init.js"
+    depends_on:
+      mongodb:
+        condition: service_healthy
+    networks:
+      - book-blog-network
+    restart: "no"
+    profiles:
+      - init
+
+networks:
+  book-blog-network:
+    driver: bridge
+
+volumes:
+  mongodb_data:
+    driver: local
+

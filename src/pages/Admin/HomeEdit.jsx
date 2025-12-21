@@ -28,6 +28,8 @@ const HomeEdit = () => {
   const nameInputRef = useRef(null);
   const introductionInputRef = useRef(null);
   const subtitleInputRef = useRef(null);
+  const avatarBlobUrlRef = useRef(null);
+  const bannerBlobUrlRef = useRef(null);
 
   useEffect(() => {
     if (!isAuthenticated()) {
@@ -36,6 +38,18 @@ const HomeEdit = () => {
       return;
     }
     loadHomeContent();
+  }, []);
+
+  // 清理 blob URLs 当组件卸载时
+  useEffect(() => {
+    return () => {
+      if (avatarBlobUrlRef.current) {
+        URL.revokeObjectURL(avatarBlobUrlRef.current);
+      }
+      if (bannerBlobUrlRef.current) {
+        URL.revokeObjectURL(bannerBlobUrlRef.current);
+      }
+    };
   }, []);
 
   // 当进入编辑状态时，聚焦输入框
@@ -64,8 +78,10 @@ const HomeEdit = () => {
       setLoading(true);
       const data = await homeAPI.get();
       setFormValues(data);
-      setAvatarImageUrl(data.avatarImage ? `http://localhost:3001${data.avatarImage}` : '');
-      setBannerImageUrl(data.bannerImage ? `http://localhost:3001${data.bannerImage}` : '');
+      // 添加时间戳防止浏览器缓存旧图片
+      const timestamp = Date.now();
+      setAvatarImageUrl(data.avatarImage ? `${data.avatarImage}?t=${timestamp}` : '');
+      setBannerImageUrl(data.bannerImage ? `${data.bannerImage}?t=${timestamp}` : '');
     } catch (error) {
       message.error('加载首页内容失败');
     } finally {
@@ -74,26 +90,40 @@ const HomeEdit = () => {
   };
 
   const handleAvatarUpload = (file) => {
+    // 清理旧的 blob URL
+    if (avatarBlobUrlRef.current) {
+      URL.revokeObjectURL(avatarBlobUrlRef.current);
+      avatarBlobUrlRef.current = null;
+    }
     setAvatarFile(file);
-    setAvatarImageUrl(URL.createObjectURL(file));
-    // 自动保存
+    const blobUrl = URL.createObjectURL(file);
+    avatarBlobUrlRef.current = blobUrl;
+    setAvatarImageUrl(blobUrl);
+    // 自动保存，直接传递文件
     setTimeout(() => {
-      handleSave();
+      handleSave(null, file, null);
     }, 100);
     return false;
   };
 
   const handleBannerUpload = (file) => {
+    // 清理旧的 blob URL
+    if (bannerBlobUrlRef.current) {
+      URL.revokeObjectURL(bannerBlobUrlRef.current);
+      bannerBlobUrlRef.current = null;
+    }
     setBannerFile(file);
-    setBannerImageUrl(URL.createObjectURL(file));
-    // 自动保存
+    const blobUrl = URL.createObjectURL(file);
+    bannerBlobUrlRef.current = blobUrl;
+    setBannerImageUrl(blobUrl);
+    // 自动保存，直接传递文件
     setTimeout(() => {
-      handleSave();
+      handleSave(null, null, file);
     }, 100);
     return false;
   };
 
-  const handleSave = async (updatedValues = null) => {
+  const handleSave = async (updatedValues = null, avatarFileToUpload = null, bannerFileToUpload = null) => {
     setSaving(true);
     try {
       const valuesToSave = updatedValues || formValues;
@@ -107,19 +137,37 @@ const HomeEdit = () => {
       formData.append('stats', JSON.stringify(valuesToSave.stats || {}));
       formData.append('siteInfo', JSON.stringify(valuesToSave.siteInfo || {}));
 
-      if (avatarFile) {
-        formData.append('avatarImage', avatarFile);
+      // 优先使用直接传递的文件，否则使用 state 中的文件
+      const fileToUploadAvatar = avatarFileToUpload || avatarFile;
+      const fileToUploadBanner = bannerFileToUpload || bannerFile;
+
+      if (fileToUploadAvatar) {
+        formData.append('avatarImage', fileToUploadAvatar);
       }
 
-      if (bannerFile) {
-        formData.append('bannerImage', bannerFile);
+      if (fileToUploadBanner) {
+        formData.append('bannerImage', fileToUploadBanner);
       }
 
       await homeAPI.update(formData);
       message.success('保存成功');
+      
+      // 清理 blob URLs
+      if (avatarBlobUrlRef.current) {
+        URL.revokeObjectURL(avatarBlobUrlRef.current);
+        avatarBlobUrlRef.current = null;
+      }
+      if (bannerBlobUrlRef.current) {
+        URL.revokeObjectURL(bannerBlobUrlRef.current);
+        bannerBlobUrlRef.current = null;
+      }
+      
+      // 清除文件引用
       setAvatarFile(null);
       setBannerFile(null);
-      loadHomeContent();
+      
+      // 重新加载完整内容以获取最新的图片URL
+      await loadHomeContent();
     } catch (error) {
       message.error(error.response?.data?.message || '保存失败');
     } finally {
@@ -225,7 +273,7 @@ const HomeEdit = () => {
             <div 
               className="absolute inset-0 banner-bg-animated cursor-pointer hover:opacity-90 transition-opacity z-0"
               style={bannerImageUrl || formValues.bannerImage ? {
-                backgroundImage: `url(${bannerImageUrl || `http://localhost:3001${formValues.bannerImage}`})`,
+                backgroundImage: `url(${bannerImageUrl || formValues.bannerImage})`,
                 backgroundSize: 'cover',
                 backgroundPosition: 'center'
               } : {
@@ -249,14 +297,12 @@ const HomeEdit = () => {
                 <div className="cursor-pointer w-full h-full flex items-center justify-center">
                   {avatarImageUrl || formValues.avatarImage ? (
                     <img 
-                      src={avatarImageUrl || `http://localhost:3001${formValues.avatarImage}`} 
+                      src={avatarImageUrl || formValues.avatarImage} 
                       alt="头像" 
                       className="w-20 h-20 rounded-full object-cover hover:opacity-80 transition-opacity"
                     />
                   ) : (
-                    <div className="w-20 h-20 rounded-full" style={{
-                      background: 'linear-gradient(135deg, #ffecd2 0%, #a8edea 100%)'
-                    }}></div>
+                    <div className="w-20 h-20 rounded-full bg-white"></div>
                   )}
                 </div>
               </Upload>

@@ -3,6 +3,35 @@ import { useNavigate } from 'react-router-dom';
 import { GithubOutlined, CameraOutlined, EyeOutlined, UserOutlined, LikeOutlined } from '@ant-design/icons';
 import { homeAPI, articleAPI, photoAPI } from '../utils/api';
 import { message } from 'antd';
+import ImageWithFallback from '../components/ImageWithFallback';
+
+// 规范化图片 URL，确保是相对路径
+const normalizeImageUrl = (url) => {
+  if (!url) return '';
+  
+  const urlString = String(url).trim();
+  if (!urlString) return '';
+  
+  // 如果已经是相对路径（以 / 开头），直接返回
+  if (urlString.startsWith('/')) {
+    return urlString;
+  }
+  
+  // 如果是完整 URL（http:// 或 https://），提取路径部分
+  if (urlString.startsWith('http://') || urlString.startsWith('https://')) {
+    try {
+      const urlObj = new URL(urlString);
+      return urlObj.pathname + urlObj.search;
+    } catch (e) {
+      // 如果不是有效 URL，尝试手动提取路径
+      const match = urlString.match(/\/uploads\/[^\s]*/);
+      return match ? match[0] : urlString;
+    }
+  }
+  
+  // 如果既不是以 / 开头也不是 http，添加 /
+  return '/' + urlString;
+};
 
 const Home = () => {
   const navigate = useNavigate();
@@ -11,12 +40,24 @@ const Home = () => {
   const [photos, setPhotos] = useState([]);
   const [loading, setLoading] = useState(true);
   const [articlesLoading, setArticlesLoading] = useState(true);
+  const [bannerImageLoaded, setBannerImageLoaded] = useState(false);
 
   useEffect(() => {
     loadHomeData();
     loadArticles();
     loadPhotos();
   }, []);
+
+  // 预加载关键图片
+  useEffect(() => {
+    if (homeData?.bannerImage) {
+      const img = new Image();
+      img.src = normalizeImageUrl(homeData.bannerImage);
+      img.onload = () => {
+        setBannerImageLoaded(true);
+      };
+    }
+  }, [homeData]);
 
   const loadHomeData = async () => {
     try {
@@ -106,30 +147,57 @@ const Home = () => {
         <div 
           className="relative w-full h-64 rounded-lg overflow-hidden mb-8"
         >
-          {/* 背景层 */}
-          <div 
-            className="absolute inset-0 banner-bg-animated"
-            style={homeData.bannerImage ? {
-              backgroundImage: `url(http://localhost:3001${homeData.bannerImage})`,
-              backgroundSize: 'cover',
-              backgroundPosition: 'center'
-            } : {
-              background: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)'
-            }}
-          ></div>
+          {/* 背景层 - 使用 img 标签以获得更好的加载性能 */}
+          <div className="absolute inset-0 banner-bg-animated overflow-hidden">
+            {homeData.bannerImage ? (
+              <>
+                {/* 占位背景 */}
+                <div 
+                  className="absolute inset-0 transition-opacity duration-300"
+                  style={{
+                    background: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)',
+                    opacity: bannerImageLoaded ? 0 : 1
+                  }}
+                ></div>
+                {/* 实际图片 */}
+                <img
+                  src={normalizeImageUrl(homeData.bannerImage)}
+                  alt="Banner"
+                  className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+                    bannerImageLoaded ? 'opacity-100' : 'opacity-0'
+                  }`}
+                  style={{
+                    objectPosition: 'center',
+                    imageRendering: 'auto'
+                  }}
+                  loading="eager"
+                  fetchPriority="high"
+                  onLoad={() => setBannerImageLoaded(true)}
+                  onError={() => setBannerImageLoaded(false)}
+                />
+              </>
+            ) : (
+              <div 
+                className="absolute inset-0"
+                style={{
+                  background: 'linear-gradient(135deg, #ffecd2 0%, #fcb69f 100%)'
+                }}
+              ></div>
+            )}
+          </div>
           {/* 内容层 */}
           <div className="absolute inset-0 flex flex-col items-center justify-center z-10">
             <div className="w-24 h-24 rounded-full bg-white/30 backdrop-blur-sm flex items-center justify-center mb-4 overflow-hidden">
               {homeData.avatarImage ? (
                 <img 
-                  src={`http://localhost:3001${homeData.avatarImage}`} 
+                  src={normalizeImageUrl(homeData.avatarImage)}
+                  loading="eager"
+                  fetchPriority="high" 
                   alt="头像" 
                   className="w-20 h-20 rounded-full object-cover"
                 />
               ) : (
-                <div className="w-20 h-20 rounded-full" style={{
-                  background: 'linear-gradient(135deg, #ffecd2 0%, #a8edea 100%)'
-                }}></div>
+                <div className="w-20 h-20 rounded-full bg-white"></div>
               )}
             </div>
             <div className="text-2xl font-bold text-white">{homeData.name || 'OBJECTX'}</div>
@@ -198,14 +266,21 @@ const Home = () => {
                   className="group relative aspect-square overflow-hidden rounded-lg cursor-pointer bg-bg-200"
                   onClick={() => navigate('/album')}
                 >
-                  <img
-                    src={`http://localhost:3001${photo.thumbnailUrl || photo.url}`}
-                    alt={photo.title}
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
-                    onError={(e) => {
-                      e.target.src = `http://localhost:3001${photo.url}`;
-                    }}
-                  />
+                <ImageWithFallback
+                  src={normalizeImageUrl(photo.thumbnailUrl || photo.url)}
+                  alt={photo.title}
+                  className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-110"
+                  loading="lazy"
+                  decoding="async"
+                  timeout={3000}
+                  onError={(e) => {
+                    // 如果缩略图加载失败，尝试加载原图
+                    if (photo.thumbnailUrl && photo.url && e.target.src !== normalizeImageUrl(photo.url)) {
+                      e.target.src = normalizeImageUrl(photo.url);
+                      return;
+                    }
+                  }}
+                />
                   <div className="absolute inset-0 bg-black/0 group-hover:bg-black/20 transition-colors"></div>
                 </div>
               ))}

@@ -10,16 +10,22 @@ router.post('/login', async (req, res) => {
   try {
     const { username, password } = req.body;
 
+    console.log('登录请求:', { username, passwordLength: password?.length });
+
     if (!username || !password) {
       return res.status(400).json({ message: '用户名和密码不能为空' });
     }
 
     const user = await User.findOne({ username });
+    console.log('查找用户结果:', user ? '找到用户' : '用户不存在');
+    
     if (!user) {
       return res.status(401).json({ message: '用户名或密码错误' });
     }
 
     const isPasswordValid = await user.comparePassword(password);
+    console.log('密码验证结果:', isPasswordValid);
+    
     if (!isPasswordValid) {
       return res.status(401).json({ message: '用户名或密码错误' });
     }

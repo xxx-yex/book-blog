@@ -198,7 +198,7 @@ const Header = () => {
           >
             <div className="ml-2 cursor-pointer">
               <Avatar 
-                src={homeData?.avatarImage ? `http://localhost:3001${homeData.avatarImage}` : undefined} 
+                src={homeData?.avatarImage ? `${homeData.avatarImage}` : undefined} 
                 icon={<UserOutlined />}
                 className="hover:ring-2 ring-primary-200 transition-all"
               />
