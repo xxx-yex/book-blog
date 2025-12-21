@@ -75,7 +75,7 @@ export const articleAPI = {
 
 // 相册相关
 export const photoAPI = {
-  getAll: () => api.get('/photos'),
+  getAll: (params) => api.get('/photos', { params }),
   getById: (id) => api.get(`/photos/${id}`),
   upload: (formData) => {
     const token = localStorage.getItem('token');

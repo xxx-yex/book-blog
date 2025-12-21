@@ -469,11 +469,27 @@ const Admin = () => {
 
         // 提取所有图片文件
         message.info('正在提取图片文件...');
+        // 根据文件扩展名获取MIME类型的辅助函数
+        const getMimeTypeFromFilename = (filename) => {
+          const ext = filename.toLowerCase().split('.').pop();
+          const mimeTypes = {
+            'jpg': 'image/jpeg',
+            'jpeg': 'image/jpeg',
+            'png': 'image/png',
+            'gif': 'image/gif',
+            'webp': 'image/webp',
+          };
+          return mimeTypes[ext] || 'image/jpeg'; // 默认为jpeg
+        };
+        
         for (const [filename, zipEntry] of Object.entries(zipData.files)) {
           if (!zipEntry.dir && filename.startsWith('images/')) {
             const blob = await zipEntry.async('blob');
             const relativePath = filename; // 例如: images/photos/xxx.jpg
-            const file = new File([blob], filename.split('/').pop(), { type: blob.type });
+            const fileName = filename.split('/').pop();
+            // 如果blob.type为空，根据文件扩展名设置MIME类型
+            const mimeType = blob.type || getMimeTypeFromFilename(fileName);
+            const file = new File([blob], fileName, { type: mimeType });
             imageFileMap.set(relativePath, file);
           }
         }
@@ -703,39 +719,33 @@ const Admin = () => {
               }
             }
 
-            // 导入首页配置（处理图片上传）
+            // 导入首页配置（一次性上传所有数据：图片+文字数据）
             if (home) {
               try {
                 const formData = new FormData();
-                formData.append('name', home.name || '');
-                formData.append('subtitle', home.subtitle || '');
-                formData.append('introduction', home.introduction || '');
-                formData.append('socialLinks', JSON.stringify(home.socialLinks || []));
-                formData.append('education', JSON.stringify(home.education || []));
-                formData.append('work', JSON.stringify(home.work || []));
-                formData.append('stats', JSON.stringify(home.stats || {}));
-                formData.append('siteInfo', JSON.stringify(home.siteInfo || {}));
                 
-                // 检查并上传头像图片
-                if (home.avatarImage) {
-                  if (imageFileMap.has(home.avatarImage)) {
-                    const imageFile = imageFileMap.get(home.avatarImage);
-                    formData.append('avatarImage', imageFile);
-                  } else {
-                    results.home.errors.push({ name: '头像图片', error: `找不到图片文件: ${home.avatarImage}` });
-                  }
+                // 添加所有文字数据字段
+                formData.append('name', home.name !== undefined && home.name !== null ? home.name : '');
+                formData.append('subtitle', home.subtitle !== undefined && home.subtitle !== null ? home.subtitle : '');
+                formData.append('introduction', home.introduction !== undefined && home.introduction !== null ? home.introduction : '');
+                formData.append('socialLinks', JSON.stringify(home.socialLinks !== undefined && home.socialLinks !== null ? home.socialLinks : []));
+                formData.append('education', JSON.stringify(home.education !== undefined && home.education !== null ? home.education : []));
+                formData.append('work', JSON.stringify(home.work !== undefined && home.work !== null ? home.work : []));
+                formData.append('stats', JSON.stringify(home.stats !== undefined && home.stats !== null ? home.stats : {}));
+                formData.append('siteInfo', JSON.stringify(home.siteInfo !== undefined && home.siteInfo !== null ? home.siteInfo : {}));
+                
+                // 检查并添加图片文件（如果存在）
+                if (home.avatarImage && imageFileMap.has(home.avatarImage)) {
+                  const avatarFile = imageFileMap.get(home.avatarImage);
+                  formData.append('avatarImage', avatarFile);
                 }
                 
-                // 检查并上传Banner图片
-                if (home.bannerImage) {
-                  if (imageFileMap.has(home.bannerImage)) {
-                    const imageFile = imageFileMap.get(home.bannerImage);
-                    formData.append('bannerImage', imageFile);
-                  } else {
-                    results.home.errors.push({ name: 'Banner图片', error: `找不到图片文件: ${home.bannerImage}` });
-                  }
+                if (home.bannerImage && imageFileMap.has(home.bannerImage)) {
+                  const bannerFile = imageFileMap.get(home.bannerImage);
+                  formData.append('bannerImage', bannerFile);
                 }
                 
+                // 一次性上传所有数据（图片+文字数据）
                 await homeAPI.update(formData);
                 results.home.success = 1;
               } catch (error) {

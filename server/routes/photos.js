@@ -44,15 +44,19 @@ const upload = multer({
   }
 });
 
-// 获取所有照片
+// 获取所有照片（支持分页）
 router.get('/', async (req, res) => {
   try {
-    const photos = await Photo.find()
+    const page = parseInt(req.query.page);
+    const limit = parseInt(req.query.limit);
+    
+    // 先获取所有照片用于过滤文件不存在的
+    const allPhotos = await Photo.find()
       .sort({ createdAt: -1 });
     
     // 过滤掉文件不存在的照片
     const validPhotos = [];
-    for (const photo of photos) {
+    for (const photo of allPhotos) {
       const filePath = path.join(__dirname, '..', photo.url);
       if (fs.existsSync(filePath)) {
         validPhotos.push(photo);
@@ -61,7 +65,23 @@ router.get('/', async (req, res) => {
       }
     }
     
-    res.json(validPhotos);
+    // 如果提供了分页参数，返回分页格式
+    if (page && limit) {
+      const skip = (page - 1) * limit;
+      const total = validPhotos.length;
+      const paginatedPhotos = validPhotos.slice(skip, skip + limit);
+      
+      res.json({
+        photos: paginatedPhotos,
+        total,
+        page,
+        limit,
+        hasMore: skip + limit < total
+      });
+    } else {
+      // 没有分页参数，返回数组格式（向后兼容）
+      res.json(validPhotos);
+    }
   } catch (error) {
     console.error('获取照片错误:', error);
     res.status(500).json({ message: '服务器错误' });

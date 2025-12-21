@@ -156,8 +156,8 @@ router.put('/', authMiddleware, (req, res, next) => {
       console.log('设置Banner路径:', home.bannerImage);
     }
 
-    // 处理社交链接
-    if (socialLinks) {
+    // 处理社交链接（即使为空数组也要更新）
+    if (socialLinks !== undefined) {
       try {
         home.socialLinks = typeof socialLinks === 'string' ? JSON.parse(socialLinks) : socialLinks;
       } catch (e) {
@@ -165,8 +165,8 @@ router.put('/', authMiddleware, (req, res, next) => {
       }
     }
 
-    // 处理教育经历
-    if (education) {
+    // 处理教育经历（即使为空数组也要更新）
+    if (education !== undefined) {
       try {
         home.education = typeof education === 'string' ? JSON.parse(education) : education;
       } catch (e) {
@@ -174,8 +174,8 @@ router.put('/', authMiddleware, (req, res, next) => {
       }
     }
 
-    // 处理工作经历
-    if (work) {
+    // 处理工作经历（即使为空数组也要更新）
+    if (work !== undefined) {
       try {
         home.work = typeof work === 'string' ? JSON.parse(work) : work;
       } catch (e) {
@@ -183,8 +183,8 @@ router.put('/', authMiddleware, (req, res, next) => {
       }
     }
 
-    // 处理统计数据
-    if (stats) {
+    // 处理统计数据（即使为空对象也要更新）
+    if (stats !== undefined) {
       try {
         home.stats = typeof stats === 'string' ? JSON.parse(stats) : stats;
       } catch (e) {
@@ -192,8 +192,8 @@ router.put('/', authMiddleware, (req, res, next) => {
       }
     }
 
-    // 处理网站信息
-    if (siteInfo) {
+    // 处理网站信息（即使为空对象也要更新）
+    if (siteInfo !== undefined) {
       try {
         home.siteInfo = typeof siteInfo === 'string' ? JSON.parse(siteInfo) : siteInfo;
       } catch (e) {

@@ -106,8 +106,7 @@ const ImageWithFallback = ({
       onError={handleError}
       style={{
         ...props.style,
-        opacity: isLoading && !hasError ? 0.5 : 1,
-        transition: 'opacity 0.3s'
+        opacity: 1
       }}
       {...props}
     />
