@@ -28,6 +28,7 @@ import { categoryAPI, articleAPI, photoAPI, bookmarkAPI, homeAPI, eventAPI } fro
 import { isAuthenticated } from '../../utils/auth';
 import LocationPicker from '../../components/LocationPicker';
 import { marked } from 'marked';
+import JSZip from 'jszip';
 
 const Admin = () => {
   const navigate = useNavigate();
@@ -297,10 +298,11 @@ const Admin = () => {
     }
   };
 
-  // 导出所有数据
+  // 导出所有数据（包含图片文件）
   const handleExportAllData = async () => {
     try {
       setLoading(true);
+      message.info('开始导出数据，正在收集图片文件...');
       
       // 获取所有数据
       const [categoriesData, articlesData, photosData, bookmarksData, homeData, eventsData] = await Promise.all([
@@ -312,35 +314,120 @@ const Admin = () => {
         eventAPI.getAll(),
       ]);
 
-      // 构建导出数据对象（包含元数据）
+      // 创建zip实例
+      const zip = new JSZip();
+      const imagesFolder = zip.folder('images');
+      const photosFolder = imagesFolder.folder('photos');
+      const homeFolder = imagesFolder.folder('home');
+
+      // 收集所有需要导出的图片路径
+      const imageUrls = new Map(); // 用于去重和映射
+      
+      // 收集相册图片
+      if (Array.isArray(photosData)) {
+        photosData.forEach((photo, index) => {
+          if (photo.url && photo.url.startsWith('/')) {
+            const originalUrl = photo.url;
+            const filename = originalUrl.split('/').pop();
+            const exportPath = `images/photos/${filename}`;
+            imageUrls.set(originalUrl, { exportPath, folder: photosFolder });
+          }
+          if (photo.thumbnailUrl && photo.thumbnailUrl.startsWith('/') && photo.thumbnailUrl !== photo.url) {
+            const originalUrl = photo.thumbnailUrl;
+            const filename = originalUrl.split('/').pop();
+            const exportPath = `images/photos/${filename}`;
+            imageUrls.set(originalUrl, { exportPath, folder: photosFolder });
+          }
+        });
+      }
+
+      // 收集首页图片
+      if (homeData) {
+        if (homeData.avatarImage && homeData.avatarImage.startsWith('/')) {
+          const originalUrl = homeData.avatarImage;
+          const filename = originalUrl.split('/').pop();
+          const exportPath = `images/home/${filename}`;
+          imageUrls.set(originalUrl, { exportPath, folder: homeFolder });
+        }
+        if (homeData.bannerImage && homeData.bannerImage.startsWith('/')) {
+          const originalUrl = homeData.bannerImage;
+          const filename = originalUrl.split('/').pop();
+          const exportPath = `images/home/${filename}`;
+          imageUrls.set(originalUrl, { exportPath, folder: homeFolder });
+        }
+      }
+
+      // 下载所有图片文件
+      message.info(`正在下载 ${imageUrls.size} 个图片文件...`);
+      let downloadedCount = 0;
+      for (const [originalUrl, { exportPath, folder }] of imageUrls) {
+        try {
+          const response = await fetch(originalUrl);
+          if (response.ok) {
+            const blob = await response.blob();
+            const filename = exportPath.split('/').pop();
+            folder.file(filename, blob);
+            downloadedCount++;
+          } else {
+            console.warn(`无法下载图片: ${originalUrl}`);
+          }
+        } catch (error) {
+          console.error(`下载图片失败: ${originalUrl}`, error);
+        }
+      }
+
+      // 构建导出数据对象，替换图片路径为相对路径
       const exportData = {
-        version: '1.0.0',
+        version: '2.0.0', // 新版本号，支持图片导出
         exportDate: new Date().toISOString(),
-        description: '网站完整数据导出',
+        description: '网站完整数据导出（包含图片文件）',
         data: {
           categories: categoriesData || [],
           articles: articlesData || [],
-          photos: photosData || [],
+          photos: Array.isArray(photosData) ? photosData.map(photo => {
+            const result = { ...photo };
+            if (photo.url && photo.url.startsWith('/')) {
+              const filename = photo.url.split('/').pop();
+              result.url = `images/photos/${filename}`;
+            }
+            if (photo.thumbnailUrl && photo.thumbnailUrl.startsWith('/')) {
+              const filename = photo.thumbnailUrl.split('/').pop();
+              result.thumbnailUrl = `images/photos/${filename}`;
+            }
+            return result;
+          }) : [],
           bookmarks: bookmarksData || {},
-          home: homeData || {},
+          home: homeData ? {
+            ...homeData,
+            avatarImage: homeData.avatarImage && homeData.avatarImage.startsWith('/')
+              ? `images/home/${homeData.avatarImage.split('/').pop()}`
+              : homeData.avatarImage,
+            bannerImage: homeData.bannerImage && homeData.bannerImage.startsWith('/')
+              ? `images/home/${homeData.bannerImage.split('/').pop()}`
+              : homeData.bannerImage,
+          } : {},
           events: eventsData || [],
         },
       };
 
-      // 创建 JSON 文件并下载
+      // 将JSON数据添加到zip
       const dataStr = JSON.stringify(exportData, null, 2);
-      const dataBlob = new Blob([dataStr], { type: 'application/json' });
-      const url = URL.createObjectURL(dataBlob);
+      zip.file('data.json', dataStr);
+
+      // 生成zip文件并下载
+      message.info('正在打包文件...');
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const url = URL.createObjectURL(zipBlob);
       const link = document.createElement('a');
       link.href = url;
       const dateStr = new Date().toISOString().split('T')[0];
-      link.download = `website_backup_${dateStr}.json`;
+      link.download = `website_backup_${dateStr}.zip`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);
       URL.revokeObjectURL(url);
 
-      message.success('数据导出成功');
+      message.success(`数据导出成功！已下载 ${downloadedCount} 个图片文件`);
     } catch (error) {
       console.error('导出失败:', error);
       message.error('导出失败：' + (error.response?.data?.message || error.message));
@@ -349,11 +436,52 @@ const Admin = () => {
     }
   };
 
-  // 导入所有数据
+  // 导入所有数据（支持zip文件和json文件）
   const handleImportAllData = async (file) => {
     try {
-      const text = await file.text();
-      const importData = JSON.parse(text);
+      let importData;
+      const imageFileMap = new Map(); // 存储图片文件映射：相对路径 -> File对象
+
+      // 判断文件类型
+      if (file.name.endsWith('.zip')) {
+        // 处理zip文件
+        message.info('正在解析zip文件...');
+        const zip = new JSZip();
+        const zipData = await zip.loadAsync(file);
+        
+        // 查找并读取data.json
+        let dataJsonFile = null;
+        for (const [filename, zipEntry] of Object.entries(zipData.files)) {
+          if (filename === 'data.json' || filename.endsWith('/data.json')) {
+            dataJsonFile = zipEntry;
+            break;
+          }
+        }
+        
+        if (!dataJsonFile) {
+          message.error('zip文件中未找到data.json文件');
+          return false;
+        }
+
+        // 读取JSON数据
+        const jsonText = await dataJsonFile.async('string');
+        importData = JSON.parse(jsonText);
+
+        // 提取所有图片文件
+        message.info('正在提取图片文件...');
+        for (const [filename, zipEntry] of Object.entries(zipData.files)) {
+          if (!zipEntry.dir && filename.startsWith('images/')) {
+            const blob = await zipEntry.async('blob');
+            const relativePath = filename; // 例如: images/photos/xxx.jpg
+            const file = new File([blob], filename.split('/').pop(), { type: blob.type });
+            imageFileMap.set(relativePath, file);
+          }
+        }
+      } else {
+        // 处理JSON文件（兼容旧版本）
+        const text = await file.text();
+        importData = JSON.parse(text);
+      }
 
       // 验证数据格式
       if (!importData.data || typeof importData.data !== 'object') {
@@ -405,21 +533,28 @@ const Admin = () => {
           try {
             setLoading(true);
             const results = {
-              categories: { success: 0, failed: 0 },
-              articles: { success: 0, failed: 0 },
-              photos: { success: 0, failed: 0 },
-              bookmarks: { success: 0, failed: 0 },
-              events: { success: 0, failed: 0 },
-              home: { success: 0, failed: 0 },
+              categories: { success: 0, failed: 0, errors: [] },
+              articles: { success: 0, failed: 0, errors: [] },
+              photos: { success: 0, failed: 0, errors: [] },
+              bookmarks: { success: 0, failed: 0, errors: [] },
+              events: { success: 0, failed: 0, errors: [] },
+              home: { success: 0, failed: 0, errors: [] },
             };
 
-            // 导入分类
+            // 导入分类（移除_id，让系统自动生成新的）
             if (Array.isArray(categories) && categories.length > 0) {
               for (const category of categories) {
                 try {
-                  await categoryAPI.create(category);
+                  // 移除_id和相关字段，让系统自动生成
+                  const { _id, __v, createdAt, updatedAt, ...categoryData } = category;
+                  await categoryAPI.create(categoryData);
                   results.categories.success++;
                 } catch (error) {
+                  const errorMsg = error.response?.data?.message || error.message || '未知错误';
+                  results.categories.errors.push({ 
+                    name: category.name || '未知分类', 
+                    error: errorMsg 
+                  });
                   results.categories.failed++;
                   console.error('导入分类失败:', category, error);
                 }
@@ -432,28 +567,114 @@ const Admin = () => {
                 const result = await articleAPI.batchImport(articles);
                 results.articles.success = result.importedCount || 0;
                 results.articles.failed = result.errorCount || 0;
+                // 收集文章导入的错误
+                if (result.errors && Array.isArray(result.errors)) {
+                  result.errors.forEach(err => {
+                    results.articles.errors.push({
+                      name: err.article || '未知文章',
+                      error: err.error || '未知错误'
+                    });
+                  });
+                }
               } catch (error) {
+                const errorMsg = error.response?.data?.message || error.message || '未知错误';
                 results.articles.failed = articles.length;
+                results.articles.errors.push({
+                  name: '批量导入',
+                  error: errorMsg
+                });
                 console.error('导入文章失败:', error);
               }
             }
 
-            // 导入相册（注意：相册需要上传图片文件，这里只导入元数据）
+            // 导入相册（上传图片并创建记录）
             if (Array.isArray(photos) && photos.length > 0) {
-              message.warning('相册数据导入功能需要图片文件，当前仅支持元数据导入');
-              // 暂时跳过相册导入，因为需要图片文件
-              results.photos.failed = photos.length;
+              message.info(`正在导入 ${photos.length} 张照片...`);
+              for (const photo of photos) {
+                let photoTitle = photo?.title || photo?.url || '未知照片';
+                try {
+                  const { _id, __v, createdAt, updatedAt, ...photoData } = photo;
+                  photoTitle = photoData.title || photo.url || '未知照片';
+                  
+                  // 检查是否有对应的图片文件
+                  if (photo.url && imageFileMap.has(photo.url)) {
+                    // 有图片文件，上传并创建记录
+                    const imageFile = imageFileMap.get(photo.url);
+                    
+                    // 验证文件类型
+                    if (!imageFile.type || !imageFile.type.startsWith('image/')) {
+                      const errorMsg = `文件类型无效: ${imageFile.name || '未知文件'}`;
+                      results.photos.errors.push({ name: photoTitle, error: errorMsg });
+                      results.photos.failed++;
+                      console.error('相册图片文件类型无效:', imageFile);
+                      continue;
+                    }
+                    
+                    const formData = new FormData();
+                    formData.append('photo', imageFile);
+                    formData.append('title', photoData.title || '');
+                    formData.append('description', photoData.description || '');
+                    if (photoData.tags && Array.isArray(photoData.tags)) {
+                      formData.append('tags', photoData.tags.join(','));
+                    }
+                    
+                    try {
+                      await photoAPI.upload(formData);
+                      results.photos.success++;
+                    } catch (uploadError) {
+                      // 上传失败，获取详细错误信息
+                      const errorMsg = uploadError.response?.data?.message || 
+                                       uploadError.response?.statusText || 
+                                       uploadError.message || 
+                                       '图片上传失败';
+                      results.photos.errors.push({ 
+                        name: photoTitle, 
+                        error: `${errorMsg} (状态码: ${uploadError.response?.status || '未知'})` 
+                      });
+                      results.photos.failed++;
+                      console.error('相册图片上传失败:', photoTitle, uploadError);
+                    }
+                  } else if (photo.url && !photo.url.startsWith('images/')) {
+                    // 旧版本数据，可能是服务器路径，尝试直接创建（可能需要手动处理）
+                    // 这种情况下跳过，因为无法获取图片文件
+                    const errorMsg = `图片路径不是相对路径，无法找到文件: ${photo.url}`;
+                    results.photos.errors.push({ name: photoTitle, error: errorMsg });
+                    results.photos.failed++;
+                    console.warn('相册图片路径不是相对路径，跳过:', photo.url);
+                  } else {
+                    const errorMsg = photo.url ? `缺少图片文件: ${photo.url}` : '缺少图片URL';
+                    results.photos.errors.push({ name: photoTitle, error: errorMsg });
+                    results.photos.failed++;
+                    console.error('相册缺少图片文件:', photo);
+                  }
+                } catch (error) {
+                  const errorMsg = error.response?.data?.message || error.message || '未知错误';
+                  results.photos.errors.push({ 
+                    name: photoTitle, 
+                    error: errorMsg 
+                  });
+                  results.photos.failed++;
+                  console.error('导入相册失败:', photo, error);
+                }
+              }
             }
 
-            // 导入书签
+            // 导入书签（移除_id，让系统自动生成新的）
             if (bookmarks && typeof bookmarks === 'object') {
               for (const [, items] of Object.entries(bookmarks)) {
                 if (Array.isArray(items)) {
                   for (const bookmark of items) {
                     try {
-                      await bookmarkAPI.create(bookmark);
+                      // 移除_id和相关字段，让系统自动生成
+                      const { _id, __v, createdAt, updatedAt, ...bookmarkData } = bookmark;
+                      await bookmarkAPI.create(bookmarkData);
                       results.bookmarks.success++;
                     } catch (error) {
+                      const errorMsg = error.response?.data?.message || error.message || '未知错误';
+                      results.bookmarks.errors.push({
+                        name: bookmark.title || bookmark.url || '未知书签',
+                        error: errorMsg
+                      });
                       results.bookmarks.failed++;
                       console.error('导入书签失败:', bookmark, error);
                     }
@@ -462,20 +683,27 @@ const Admin = () => {
               }
             }
 
-            // 导入时间事件
+            // 导入时间事件（移除_id，让系统自动生成新的）
             if (Array.isArray(events) && events.length > 0) {
               for (const event of events) {
                 try {
-                  await eventAPI.create(event);
+                  // 移除_id和相关字段，让系统自动生成
+                  const { _id, __v, createdAt, updatedAt, ...eventData } = event;
+                  await eventAPI.create(eventData);
                   results.events.success++;
                 } catch (error) {
+                  const errorMsg = error.response?.data?.message || error.message || '未知错误';
+                  results.events.errors.push({
+                    name: event.title || event.date || '未知事件',
+                    error: errorMsg
+                  });
                   results.events.failed++;
                   console.error('导入时间事件失败:', event, error);
                 }
               }
             }
 
-            // 导入首页配置
+            // 导入首页配置（处理图片上传）
             if (home) {
               try {
                 const formData = new FormData();
@@ -487,9 +715,32 @@ const Admin = () => {
                 formData.append('work', JSON.stringify(home.work || []));
                 formData.append('stats', JSON.stringify(home.stats || {}));
                 formData.append('siteInfo', JSON.stringify(home.siteInfo || {}));
+                
+                // 检查并上传头像图片
+                if (home.avatarImage) {
+                  if (imageFileMap.has(home.avatarImage)) {
+                    const imageFile = imageFileMap.get(home.avatarImage);
+                    formData.append('avatarImage', imageFile);
+                  } else {
+                    results.home.errors.push({ name: '头像图片', error: `找不到图片文件: ${home.avatarImage}` });
+                  }
+                }
+                
+                // 检查并上传Banner图片
+                if (home.bannerImage) {
+                  if (imageFileMap.has(home.bannerImage)) {
+                    const imageFile = imageFileMap.get(home.bannerImage);
+                    formData.append('bannerImage', imageFile);
+                  } else {
+                    results.home.errors.push({ name: 'Banner图片', error: `找不到图片文件: ${home.bannerImage}` });
+                  }
+                }
+                
                 await homeAPI.update(formData);
                 results.home.success = 1;
               } catch (error) {
+                const errorMsg = error.response?.data?.message || error.message || '未知错误';
+                results.home.errors.push({ name: '首页配置', error: errorMsg });
                 results.home.failed = 1;
                 console.error('导入首页配置失败:', error);
               }
@@ -499,9 +750,49 @@ const Admin = () => {
             const successTotal = Object.values(results).reduce((sum, r) => sum + r.success, 0);
             const failedTotal = Object.values(results).reduce((sum, r) => sum + r.failed, 0);
             
-            message.success(
-              `导入完成：成功 ${successTotal} 项，失败 ${failedTotal} 项`
-            );
+            // 收集所有错误信息
+            const allErrors = [];
+            Object.entries(results).forEach(([key, value]) => {
+              if (value.errors && value.errors.length > 0) {
+                const typeNames = {
+                  categories: '分类',
+                  articles: '文章',
+                  photos: '相册',
+                  bookmarks: '书签',
+                  events: '时间事件',
+                  home: '首页配置'
+                };
+                value.errors.forEach(err => {
+                  allErrors.push({ type: typeNames[key] || key, ...err });
+                });
+              }
+            });
+
+            if (failedTotal > 0) {
+              // 显示详细错误信息
+              Modal.error({
+                title: `导入完成：成功 ${successTotal} 项，失败 ${failedTotal} 项`,
+                width: 700,
+                content: (
+                  <div className="max-h-96 overflow-y-auto">
+                    <div className="text-sm text-text-200 mb-4">
+                      <p className="mb-2">以下项目导入失败：</p>
+                      <div className="space-y-2">
+                        {allErrors.map((err, index) => (
+                          <div key={index} className="p-2 bg-red-50 border border-red-200 rounded">
+                            <div className="font-semibold text-red-800">{err.type} - {err.name}</div>
+                            <div className="text-red-600 text-xs mt-1">{err.error}</div>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                ),
+                okText: '我知道了',
+              });
+            } else {
+              message.success(`导入完成：成功 ${successTotal} 项`);
+            }
 
             // 重新加载数据
             loadData();
@@ -1342,14 +1633,14 @@ const Admin = () => {
           <div className="mb-6">
             <h2 className="text-lg font-semibold text-black mb-4">数据导入/导出</h2>
             <p className="text-text-200 mb-6">
-              您可以导出所有网站数据（分类、文章、相册、书签、首页配置）为 JSON 文件，也可以从 JSON 文件导入数据。
+              您可以导出所有网站数据（包含图片文件）为 ZIP 压缩包，也可以从 ZIP 或 JSON 文件导入数据。新版本导出包含图片文件，旧版本 JSON 文件仍可兼容导入。
             </p>
             
             <Space direction="vertical" size="large" className="w-full">
               <div className="p-4 border border-bg-300 rounded-lg">
                 <h3 className="text-base font-semibold text-text-100 mb-2">导出数据</h3>
                 <p className="text-sm text-text-200 mb-4">
-                  导出所有数据为 JSON 格式文件，包含：分类、文章、相册、书签、时间事件、首页配置
+                  导出所有数据为 ZIP 压缩包，包含：分类、文章、相册（含图片）、书签、时间事件、首页配置（含头像和Banner图片）。压缩包内包含 data.json 数据文件和 images 图片文件夹。
                 </p>
                 <Button
                   className="bg-gray-800 text-white hover:bg-gray-700 border-none"
@@ -1357,17 +1648,17 @@ const Admin = () => {
                   onClick={handleExportAllData}
                   loading={loading}
                 >
-                  导出所有数据
+                  导出所有数据（ZIP）
                 </Button>
               </div>
 
               <div className="p-4 border border-bg-300 rounded-lg">
                 <h3 className="text-base font-semibold text-text-100 mb-2">导入数据</h3>
                 <p className="text-sm text-text-200 mb-4">
-                  从 JSON 文件导入数据。注意：导入会覆盖现有数据，请谨慎操作！
+                  支持导入 ZIP 压缩包（新版本，包含图片）或 JSON 文件（旧版本，仅数据）。注意：导入会覆盖现有数据，请谨慎操作！
                 </p>
                 <Upload
-                  accept=".json"
+                  accept=".zip,.json"
                   beforeUpload={handleImportAllData}
                   showUploadList={false}
                 >
@@ -1376,7 +1667,7 @@ const Admin = () => {
                     icon={<ImportOutlined />}
                     loading={loading}
                   >
-                    选择文件导入
+                    选择文件导入（ZIP/JSON）
                   </Button>
                 </Upload>
               </div>
