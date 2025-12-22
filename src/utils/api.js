@@ -141,5 +141,31 @@ export const eventAPI = {
   batchDelete: (ids) => api.post('/events/batch-delete', { ids }),
 };
 
+// 旅行日记相关
+export const travelAPI = {
+  getAll: () => api.get('/travels'),
+  getById: (id) => api.get(`/travels/${id}`),
+  create: (formData) => {
+    const token = localStorage.getItem('token');
+    return api.post('/travels', formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        Authorization: token ? `Bearer ${token}` : '',
+      },
+    });
+  },
+  update: (id, formData) => {
+    const token = localStorage.getItem('token');
+    return api.put(`/travels/${id}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+        Authorization: token ? `Bearer ${token}` : '',
+      },
+    });
+  },
+  delete: (id) => api.delete(`/travels/${id}`),
+  batchDelete: (ids) => api.post('/travels/batch-delete', { ids }),
+};
+
 export default api;
 

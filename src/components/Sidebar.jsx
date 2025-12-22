@@ -229,6 +229,7 @@ const Sidebar = () => {
       { key: 'categories', label: '分类管理' },
       { key: 'articles', label: '文章管理' },
       { key: 'photos', label: '相册管理' },
+      { key: 'travels', label: '旅行日记管理' },
       { key: 'bookmarks', label: '导航管理' },
       { key: 'events', label: '时间事件管理' },
       { key: 'data', label: '数据管理' },
@@ -241,7 +242,9 @@ const Sidebar = () => {
       : (searchParams.get('tab') || localStorage.getItem('adminActiveTab') || 'categories');
 
     const handleTabClick = (tabKey) => {
-      if (tabKey === 'password') {
+      if (tabKey === 'travels') {
+        navigate('/admin/travels');
+      } else if (tabKey === 'password') {
         navigate('/admin/password');
       } else {
         localStorage.setItem('adminActiveTab', tabKey);

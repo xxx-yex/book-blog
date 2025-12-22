@@ -24,7 +24,7 @@ import {
   ClockCircleOutlined,
   ReloadOutlined
 } from '@ant-design/icons';
-import { categoryAPI, articleAPI, photoAPI, bookmarkAPI, homeAPI, eventAPI } from '../../utils/api';
+import { categoryAPI, articleAPI, photoAPI, bookmarkAPI, homeAPI, eventAPI, travelAPI } from '../../utils/api';
 import { isAuthenticated } from '../../utils/auth';
 import LocationPicker from '../../components/LocationPicker';
 import { marked } from 'marked';
@@ -56,6 +56,13 @@ const Admin = () => {
   const [editingEvent, setEditingEvent] = useState(null);
   const [eventForm] = Form.useForm();
   const [selectedEventIds, setSelectedEventIds] = useState([]);
+  const [travels, setTravels] = useState([]);
+  const [travelModalOpen, setTravelModalOpen] = useState(false);
+  const [editingTravel, setEditingTravel] = useState(null);
+  const [travelForm] = Form.useForm();
+  const [selectedTravelIds, setSelectedTravelIds] = useState([]);
+  const [travelImages, setTravelImages] = useState([]);
+  const [travelImageFileList, setTravelImageFileList] = useState([]);
   
   // 从 URL 参数或 localStorage 获取当前选中的标签
   const activeTab = searchParams.get('tab') || localStorage.getItem('adminActiveTab') || 'categories';
@@ -72,12 +79,13 @@ const Admin = () => {
   const loadData = async () => {
     setLoading(true);
     try {
-      const [categoriesData, articlesData, photosData, bookmarksData, eventsData] = await Promise.all([
+      const [categoriesData, articlesData, photosData, bookmarksData, eventsData, travelsData] = await Promise.all([
         categoryAPI.getAll(),
         articleAPI.getAll(),
         photoAPI.getAll(),
         bookmarkAPI.getAll(),
         eventAPI.getAll(),
+        travelAPI.getAll(),
       ]);
       setCategories(categoriesData);
       setArticles(articlesData);
@@ -86,6 +94,7 @@ const Admin = () => {
       const bookmarksArray = Object.values(bookmarksData).flat();
       setBookmarks(bookmarksArray);
       setEvents(eventsData);
+      setTravels(travelsData);
     } catch (error) {
       message.error('加载数据失败');
     } finally {
@@ -305,13 +314,14 @@ const Admin = () => {
       message.info('开始导出数据，正在收集图片文件...');
       
       // 获取所有数据
-      const [categoriesData, articlesData, photosData, bookmarksData, homeData, eventsData] = await Promise.all([
+      const [categoriesData, articlesData, photosData, bookmarksData, homeData, eventsData, travelsData] = await Promise.all([
         categoryAPI.getAll(),
         articleAPI.getAll(),
         photoAPI.getAll(),
         bookmarkAPI.getAll(),
         homeAPI.get(),
         eventAPI.getAll(),
+        travelAPI.getAll(),
       ]);
 
       // 创建zip实例
@@ -319,6 +329,7 @@ const Admin = () => {
       const imagesFolder = zip.folder('images');
       const photosFolder = imagesFolder.folder('photos');
       const homeFolder = imagesFolder.folder('home');
+      const travelsFolder = imagesFolder.folder('travels');
 
       // 收集所有需要导出的图片路径
       const imageUrls = new Map(); // 用于去重和映射
@@ -355,6 +366,22 @@ const Admin = () => {
           const exportPath = `images/home/${filename}`;
           imageUrls.set(originalUrl, { exportPath, folder: homeFolder });
         }
+      }
+
+      // 收集旅行日记图片
+      if (Array.isArray(travelsData)) {
+        travelsData.forEach((travel) => {
+          if (travel.images && Array.isArray(travel.images)) {
+            travel.images.forEach((imageUrl) => {
+              if (imageUrl && imageUrl.startsWith('/')) {
+                const originalUrl = imageUrl;
+                const filename = originalUrl.split('/').pop();
+                const exportPath = `images/travels/${filename}`;
+                imageUrls.set(originalUrl, { exportPath, folder: travelsFolder });
+              }
+            });
+          }
+        });
       }
 
       // 下载所有图片文件
@@ -407,6 +434,19 @@ const Admin = () => {
               : homeData.bannerImage,
           } : {},
           events: eventsData || [],
+          travels: Array.isArray(travelsData) ? travelsData.map(travel => {
+            const result = { ...travel };
+            if (travel.images && Array.isArray(travel.images)) {
+              result.images = travel.images.map(imageUrl => {
+                if (imageUrl && imageUrl.startsWith('/')) {
+                  const filename = imageUrl.split('/').pop();
+                  return `images/travels/${filename}`;
+                }
+                return imageUrl;
+              });
+            }
+            return result;
+          }) : [],
         },
       };
 
@@ -485,7 +525,7 @@ const Admin = () => {
         for (const [filename, zipEntry] of Object.entries(zipData.files)) {
           if (!zipEntry.dir && filename.startsWith('images/')) {
             const blob = await zipEntry.async('blob');
-            const relativePath = filename; // 例如: images/photos/xxx.jpg
+            const relativePath = filename; // 例如: images/photos/xxx.jpg 或 images/travels/xxx.jpg
             const fileName = filename.split('/').pop();
             // 如果blob.type为空，根据文件扩展名设置MIME类型
             const mimeType = blob.type || getMimeTypeFromFilename(fileName);
@@ -505,7 +545,7 @@ const Admin = () => {
         return false;
       }
 
-      const { categories, articles, photos, bookmarks, home, events } = importData.data;
+      const { categories, articles, photos, bookmarks, home, events, travels } = importData.data;
 
       // 统计数据量
       const stats = {
@@ -515,9 +555,10 @@ const Admin = () => {
         bookmarks: bookmarks ? Object.keys(bookmarks).reduce((sum, key) => sum + (bookmarks[key]?.length || 0), 0) : 0,
         home: home ? 1 : 0,
         events: Array.isArray(events) ? events.length : 0,
+        travels: Array.isArray(travels) ? travels.length : 0,
       };
 
-      const totalItems = stats.categories + stats.articles + stats.photos + stats.bookmarks + stats.home + stats.events;
+      const totalItems = stats.categories + stats.articles + stats.photos + stats.bookmarks + stats.home + stats.events + stats.travels;
 
       if (totalItems === 0) {
         message.error('导入文件为空');
@@ -535,6 +576,7 @@ const Admin = () => {
               {stats.photos > 0 && <li>相册：{stats.photos} 张</li>}
               {stats.bookmarks > 0 && <li>书签：{stats.bookmarks} 个</li>}
               {stats.events > 0 && <li>时间事件：{stats.events} 个</li>}
+              {stats.travels > 0 && <li>旅行日记：{stats.travels} 条</li>}
               {stats.home > 0 && <li>首页配置：1 个</li>}
             </ul>
             <p className="mt-3 text-red-600 text-sm font-semibold">
@@ -554,6 +596,7 @@ const Admin = () => {
               photos: { success: 0, failed: 0, errors: [] },
               bookmarks: { success: 0, failed: 0, errors: [] },
               events: { success: 0, failed: 0, errors: [] },
+              travels: { success: 0, failed: 0, errors: [] },
               home: { success: 0, failed: 0, errors: [] },
             };
 
@@ -719,6 +762,78 @@ const Admin = () => {
               }
             }
 
+            // 导入旅行日记（上传图片并创建记录）
+            if (Array.isArray(travels) && travels.length > 0) {
+              message.info(`正在导入 ${travels.length} 条旅行日记...`);
+              for (const travel of travels) {
+                let travelTitle = travel?.title || '未知旅行日记';
+                try {
+                  const { _id, __v, createdAt, updatedAt, ...travelData } = travel;
+                  travelTitle = travelData.title || '未知旅行日记';
+                  
+                  // 准备表单数据
+                  const formData = new FormData();
+                  formData.append('title', travelData.title || '');
+                  formData.append('location', travelData.location || '');
+                  formData.append('rating', travelData.rating || 5);
+                  formData.append('date', travelData.date ? new Date(travelData.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0]);
+                  formData.append('weather', travelData.weather || '');
+                  formData.append('transport', travelData.transport || '');
+                  formData.append('description', travelData.description || '');
+
+                  // 检查是否有对应的图片文件
+                  if (travelData.images && Array.isArray(travelData.images)) {
+                    let imageCount = 0;
+                    for (const imagePath of travelData.images) {
+                      if (imagePath && imageFileMap.has(imagePath)) {
+                        const imageFile = imageFileMap.get(imagePath);
+                        
+                        // 验证文件类型
+                        if (!imageFile.type || !imageFile.type.startsWith('image/')) {
+                          continue;
+                        }
+                        
+                        formData.append('images', imageFile);
+                        imageCount++;
+                      }
+                    }
+                    
+                    if (imageCount === 0 && travelData.images.length > 0) {
+                      const errorMsg = `缺少图片文件`;
+                      results.travels.errors.push({ name: travelTitle, error: errorMsg });
+                      results.travels.failed++;
+                      console.warn('旅行日记缺少图片文件:', travelTitle);
+                      continue;
+                    }
+                  }
+                  
+                  try {
+                    await travelAPI.create(formData);
+                    results.travels.success++;
+                  } catch (uploadError) {
+                    const errorMsg = uploadError.response?.data?.message || 
+                                     uploadError.response?.statusText || 
+                                     uploadError.message || 
+                                     '旅行日记创建失败';
+                    results.travels.errors.push({ 
+                      name: travelTitle, 
+                      error: `${errorMsg} (状态码: ${uploadError.response?.status || '未知'})` 
+                    });
+                    results.travels.failed++;
+                    console.error('旅行日记创建失败:', travelTitle, uploadError);
+                  }
+                } catch (error) {
+                  const errorMsg = error.response?.data?.message || error.message || '未知错误';
+                  results.travels.errors.push({ 
+                    name: travelTitle, 
+                    error: errorMsg 
+                  });
+                  results.travels.failed++;
+                  console.error('导入旅行日记失败:', travel, error);
+                }
+              }
+            }
+
             // 导入首页配置（一次性上传所有数据：图片+文字数据）
             if (home) {
               try {
@@ -770,6 +885,7 @@ const Admin = () => {
                   photos: '相册',
                   bookmarks: '书签',
                   events: '时间事件',
+                  travels: '旅行日记',
                   home: '首页配置'
                 };
                 value.errors.forEach(err => {
@@ -996,6 +1112,105 @@ const Admin = () => {
         }
       },
     });
+  };
+
+  // 旅行日记相关函数
+  const handleTravelSubmit = async (values) => {
+    try {
+      const formData = new FormData();
+      formData.append('title', values.title);
+      formData.append('location', values.location || '');
+      formData.append('rating', values.rating || 5);
+      formData.append('date', values.date);
+      formData.append('weather', values.weather || '');
+      formData.append('transport', values.transport || '');
+      formData.append('description', values.description || '');
+
+      // 处理图片
+      if (editingTravel) {
+        // 编辑模式：保留现有图片
+        formData.append('existingImages', JSON.stringify(travelImages));
+      }
+
+      // 添加新上传的图片
+      travelImageFileList.forEach((file) => {
+        if (file.originFileObj) {
+          formData.append('images', file.originFileObj);
+        }
+      });
+
+      if (editingTravel) {
+        await travelAPI.update(editingTravel._id, formData);
+        message.success('旅行日记更新成功');
+      } else {
+        await travelAPI.create(formData);
+        message.success('旅行日记创建成功');
+      }
+      setTravelModalOpen(false);
+      setEditingTravel(null);
+      setTravelImages([]);
+      setTravelImageFileList([]);
+      travelForm.resetFields();
+      loadData();
+    } catch (error) {
+      message.error(error.response?.data?.message || '操作失败');
+    }
+  };
+
+  const handleTravelEdit = (record) => {
+    setEditingTravel(record);
+    setTravelImages(record.images || []);
+    setTravelImageFileList([]);
+    travelForm.setFieldsValue({
+      title: record.title,
+      location: record.location || '',
+      rating: record.rating || 5,
+      date: record.date ? new Date(record.date).toISOString().split('T')[0] : '',
+      weather: record.weather || '',
+      transport: record.transport || '',
+      description: record.description || '',
+    });
+    setTravelModalOpen(true);
+  };
+
+  const handleTravelDelete = async (id) => {
+    try {
+      await travelAPI.delete(id);
+      message.success('删除成功');
+      loadData();
+    } catch (error) {
+      message.error(error.response?.data?.message || '删除失败');
+    }
+  };
+
+  const handleBatchTravelDelete = async () => {
+    if (selectedTravelIds.length === 0) {
+      message.warning('请先选择要删除的旅行日记');
+      return;
+    }
+
+    Modal.confirm({
+      title: '确认批量删除',
+      content: `确定要删除选中的 ${selectedTravelIds.length} 条旅行日记吗？此操作不可恢复。`,
+      onOk: async () => {
+        try {
+          await travelAPI.batchDelete(selectedTravelIds);
+          message.success(`成功删除 ${selectedTravelIds.length} 条旅行日记`);
+          setSelectedTravelIds([]);
+          loadData();
+        } catch (error) {
+          message.error(error.response?.data?.message || '批量删除失败');
+        }
+      },
+    });
+  };
+
+  const handleTravelImageRemove = (file) => {
+    if (file.url) {
+      // 移除现有图片
+      setTravelImages(travelImages.filter(img => img !== file.url));
+    }
+    return true;
   };
 
   // 按年份、月份和日期分组事件（用于时间线展示）
@@ -1636,6 +1851,108 @@ const Admin = () => {
       ),
     },
     {
+      key: 'travels',
+      label: '旅行日记管理',
+      children: (
+        <Card>
+          <div className="mb-4 flex justify-between items-center">
+            <h2 className="text-lg font-semibold text-black">旅行日记列表</h2>
+            <Space>
+              {selectedTravelIds.length > 0 && (
+                <Button 
+                  danger
+                  icon={<DeleteOutlined />}
+                  onClick={handleBatchTravelDelete}
+                >
+                  批量删除 ({selectedTravelIds.length})
+                </Button>
+              )}
+              <Button 
+                className="bg-gray-800 text-white hover:bg-gray-700 border-none"
+                icon={<PlusOutlined />}
+                onClick={() => {
+                  setEditingTravel(null);
+                  setTravelImages([]);
+                  setTravelImageFileList([]);
+                  travelForm.resetFields();
+                  setTravelModalOpen(true);
+                }}
+              >
+                新增旅行日记
+              </Button>
+            </Space>
+          </div>
+          <Table
+            columns={[
+              {
+                title: '标题',
+                dataIndex: 'title',
+                key: 'title',
+              },
+              {
+                title: '位置',
+                dataIndex: 'location',
+                key: 'location',
+                render: (location) => location || '-',
+              },
+              {
+                title: '日期',
+                dataIndex: 'date',
+                key: 'date',
+                render: (date) => date ? new Date(date).toLocaleDateString('zh-CN') : '-',
+                sorter: (a, b) => new Date(a.date) - new Date(b.date),
+              },
+              {
+                title: '评分',
+                dataIndex: 'rating',
+                key: 'rating',
+                render: (rating) => '★'.repeat(rating || 0),
+              },
+              {
+                title: '图片数',
+                dataIndex: 'images',
+                key: 'images',
+                render: (images) => images?.length || 0,
+              },
+              {
+                title: '操作',
+                key: 'action',
+                render: (_, record) => (
+                  <Space>
+                    <Button 
+                      type="link" 
+                      icon={<EditOutlined />}
+                      onClick={() => handleTravelEdit(record)}
+                    >
+                      编辑
+                    </Button>
+                    <Popconfirm
+                      title="确定要删除这条旅行日记吗？"
+                      onConfirm={() => handleTravelDelete(record._id)}
+                    >
+                      <Button type="link" danger icon={<DeleteOutlined />}>
+                        删除
+                      </Button>
+                    </Popconfirm>
+                  </Space>
+                ),
+              },
+            ]}
+            dataSource={travels}
+            rowKey="_id"
+            loading={loading}
+            pagination={{ pageSize: 10 }}
+            rowSelection={{
+              selectedRowKeys: selectedTravelIds,
+              onChange: (selectedRowKeys) => {
+                setSelectedTravelIds(selectedRowKeys);
+              },
+            }}
+          />
+        </Card>
+      ),
+    },
+    {
       key: 'data',
       label: '数据管理',
       children: (
@@ -1650,7 +1967,7 @@ const Admin = () => {
               <div className="p-4 border border-bg-300 rounded-lg">
                 <h3 className="text-base font-semibold text-text-100 mb-2">导出数据</h3>
                 <p className="text-sm text-text-200 mb-4">
-                  导出所有数据为 ZIP 压缩包，包含：分类、文章、相册（含图片）、书签、时间事件、首页配置（含头像和Banner图片）。压缩包内包含 data.json 数据文件和 images 图片文件夹。
+                  导出所有数据为 ZIP 压缩包，包含：分类、文章、相册（含图片）、书签、时间事件、旅行日记（含图片）、首页配置（含头像和Banner图片）。压缩包内包含 data.json 数据文件和 images 图片文件夹。
                 </p>
                 <Button
                   className="bg-gray-800 text-white hover:bg-gray-700 border-none"
@@ -1948,6 +2265,141 @@ const Admin = () => {
                 <Button onClick={() => {
                   setEventModalOpen(false);
                   eventForm.resetFields();
+                }}>
+                  取消
+                </Button>
+              </Space>
+            </Form.Item>
+          </Form>
+        </Modal>
+
+        {/* 旅行日记编辑弹窗 */}
+        <Modal
+          title={editingTravel ? '编辑旅行日记' : '新增旅行日记'}
+          open={travelModalOpen}
+          onCancel={() => {
+            setTravelModalOpen(false);
+            setEditingTravel(null);
+            setTravelImages([]);
+            setTravelImageFileList([]);
+            travelForm.resetFields();
+          }}
+          footer={null}
+          width={800}
+        >
+          <Form
+            form={travelForm}
+            layout="vertical"
+            onFinish={handleTravelSubmit}
+            className="mt-4"
+          >
+            <Form.Item
+              name="title"
+              label="标题"
+              rules={[{ required: true, message: '请输入标题' }]}
+            >
+              <Input placeholder="请输入旅行日记标题" />
+            </Form.Item>
+            <Form.Item
+              name="location"
+              label="位置"
+            >
+              <LocationPicker placeholder="请选择或输入位置（可选）" />
+            </Form.Item>
+            <Form.Item
+              name="rating"
+              label="评分"
+              initialValue={5}
+            >
+              <InputNumber min={1} max={5} placeholder="1-5星" style={{ width: '100%' }} />
+            </Form.Item>
+            <Form.Item
+              name="date"
+              label="日期"
+              rules={[{ required: true, message: '请选择日期' }]}
+            >
+              <Input type="date" />
+            </Form.Item>
+            <Form.Item
+              name="weather"
+              label="天气"
+            >
+              <Input placeholder="例如：晴天、多云等（可选）" />
+            </Form.Item>
+            <Form.Item
+              name="transport"
+              label="交通工具"
+            >
+              <Input placeholder="例如：飞机、火车、自驾等（可选）" />
+            </Form.Item>
+            <Form.Item
+              name="description"
+              label="描述"
+            >
+              <Input.TextArea rows={6} placeholder="请输入旅行日记描述（可选）" />
+            </Form.Item>
+            <Form.Item
+              label="图片"
+            >
+              {/* 显示现有图片 */}
+              {travelImages.length > 0 && (
+                <div className="mb-4">
+                  <div className="text-sm text-text-200 mb-2">现有图片：</div>
+                  <div className="grid grid-cols-4 gap-2">
+                    {travelImages.map((imageUrl, index) => (
+                      <div key={index} className="relative group">
+                        <img
+                          src={imageUrl}
+                          alt={`现有图片 ${index + 1}`}
+                          className="w-full h-20 object-cover rounded"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setTravelImages(travelImages.filter((_, i) => i !== index));
+                          }}
+                          className="absolute top-1 right-1 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity"
+                        >
+                          ×
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+              <Upload
+                listType="picture-card"
+                fileList={travelImageFileList}
+                beforeUpload={() => false}
+                onChange={({ fileList }) => {
+                  setTravelImageFileList(fileList);
+                }}
+                onRemove={handleTravelImageRemove}
+                multiple
+              >
+                {travelImageFileList.length < 20 && <div>
+                  <PlusOutlined />
+                  <div style={{ marginTop: 8 }}>上传图片</div>
+                </div>}
+              </Upload>
+              <div className="text-xs text-text-200 mt-2">
+                最多可上传20张图片，支持 jpeg, jpg, png, gif, webp 格式
+              </div>
+            </Form.Item>
+            <Form.Item>
+              <Space>
+                <Button 
+                  className="bg-gray-800 text-white hover:bg-gray-700 border-none"
+                  htmlType="submit"
+                >
+                  {editingTravel ? '更新' : '创建'}
+                </Button>
+                <Button onClick={() => {
+                  setTravelModalOpen(false);
+                  setEditingTravel(null);
+                  setTravelImages([]);
+                  setTravelImageFileList([]);
+                  travelForm.resetFields();
                 }}>
                   取消
                 </Button>

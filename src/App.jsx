@@ -4,6 +4,7 @@ import Home from './pages/Home';
 import ArticleDetail from './pages/ArticleDetail';
 import Admin from './pages/Admin/Admin';
 import ArticleEdit from './pages/Admin/ArticleEdit';
+import TravelManage from './pages/Admin/TravelManage';
 import HomeEdit from './pages/Admin/HomeEdit';
 import PasswordChange from './pages/Admin/PasswordChange';
 import Articles from './pages/Articles';
@@ -28,6 +29,7 @@ function App() {
           <Route path="/nav" element={<Nav />} />
           <Route path="/notes" element={<Notes />} />
           <Route path="/admin" element={<Admin />} />
+          <Route path="/admin/travels" element={<TravelManage />} />
           <Route path="/admin/article/:id?" element={<ArticleEdit />} />
           <Route path="/admin/home" element={<HomeEdit />} />
           <Route path="/admin/password" element={<PasswordChange />} />
