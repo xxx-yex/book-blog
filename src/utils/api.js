@@ -1,9 +1,25 @@
 import axios from 'axios';
 
+// 确保使用相对路径，这样无论HTTP还是HTTPS都能正常工作
+// 如果设置了环境变量 VITE_API_BASE_URL，则使用环境变量，否则使用相对路径
+const getBaseURL = () => {
+  // 优先使用环境变量（如果设置了）
+  if (import.meta.env.VITE_API_BASE_URL) {
+    return import.meta.env.VITE_API_BASE_URL;
+  }
+  // 默认使用相对路径，这样会使用当前域名（HTTP或HTTPS）
+  return '/api';
+};
+
 const api = axios.create({
-  baseURL: '/api',
+  baseURL: getBaseURL(),
   timeout: 10000,
 });
+
+// 开发环境下打印baseURL，方便调试
+if (import.meta.env.DEV) {
+  console.log('API Base URL:', api.defaults.baseURL);
+}
 
 // 请求拦截器 - 添加 token
 api.interceptors.request.use(

@@ -54,9 +54,10 @@ services:
     container_name: book-blog-frontend
     restart: unless-stopped
     ports:
-      - "44880:80"
-    environment:
-      - VITE_API_URL=http://localhost:44881
+      - "80:80"
+      - "443:443"
+    volumes:
+      - /root/gwewuv.top_nginx:/etc/nginx/ssl:ro
     depends_on:
       - backend
     networks:
