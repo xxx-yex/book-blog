@@ -615,13 +615,18 @@ const Admin = () => {
               home: { success: 0, failed: 0, errors: [] },
             };
 
+            const categoryIdMap = new Map(); // 旧分类ID -> 新分类ID
+
             // 导入分类（移除_id，让系统自动生成新的）
             if (Array.isArray(categories) && categories.length > 0) {
               for (const category of categories) {
                 try {
                   // 移除_id和相关字段，让系统自动生成
                   const { _id, __v, createdAt, updatedAt, ...categoryData } = category;
-                  await categoryAPI.create(categoryData);
+                  const newCategory = await categoryAPI.create(categoryData);
+                  if (category._id && newCategory._id) {
+                    categoryIdMap.set(category._id, newCategory._id);
+                  }
                   results.categories.success++;
                 } catch (error) {
                   const errorMsg = error.response?.data?.message || error.message || '未知错误';
@@ -638,7 +643,19 @@ const Admin = () => {
             // 导入文章
             if (Array.isArray(articles) && articles.length > 0) {
               try {
-                const result = await articleAPI.batchImport(articles);
+                // 更新文章的分类ID
+                const updatedArticles = articles.map(article => {
+                  const newArticle = { ...article };
+                  if (newArticle.category) {
+                    const oldCatId = typeof newArticle.category === 'object' ? newArticle.category._id : newArticle.category;
+                    if (categoryIdMap.has(oldCatId)) {
+                      newArticle.category = categoryIdMap.get(oldCatId);
+                    }
+                  }
+                  return newArticle;
+                });
+
+                const result = await articleAPI.batchImport(updatedArticles);
                 results.articles.success = result.importedCount || 0;
                 results.articles.failed = result.errorCount || 0;
                 // 收集文章导入的错误

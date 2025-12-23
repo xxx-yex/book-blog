@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Upload, message } from 'antd';
-import { UploadOutlined, GithubOutlined, HeartOutlined, EyeOutlined, UserOutlined, TeamOutlined } from '@ant-design/icons';
+import { GithubOutlined } from '@ant-design/icons';
 import { isAuthenticated } from '../../utils/auth';
 import { homeAPI } from '../../utils/api';
 
@@ -404,40 +404,7 @@ const HomeEdit = () => {
           </div>
         )}
 
-        {/* 运行信息 */}
-        <div className="mb-8">
-          <h2 className="text-lg font-semibold text-text-100 mb-4">运行信息</h2>
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div className="bg-white rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <HeartOutlined className="text-red-500" />
-                <span className="text-sm text-text-200">喜欢</span>
-              </div>
-              <div className="text-2xl font-bold text-text-100">{formValues.stats?.likes || 166}</div>
-            </div>
-            <div className="bg-white rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <EyeOutlined className="text-blue-500" />
-                <span className="text-sm text-text-200">访问人数</span>
-              </div>
-              <div className="text-2xl font-bold text-text-100">{formValues.stats?.views || 4057}</div>
-            </div>
-            <div className="bg-white rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <UserOutlined className="text-green-500" />
-                <span className="text-sm text-text-200">在线人数</span>
-              </div>
-              <div className="text-2xl font-bold text-text-100">{formValues.stats?.online || 1}</div>
-            </div>
-            <div className="bg-white rounded-lg p-4">
-              <div className="flex items-center gap-2 mb-2">
-                <TeamOutlined className="text-purple-500" />
-                <span className="text-sm text-text-200">关注我</span>
-              </div>
-              <div className="text-2xl font-bold text-text-100">{formValues.stats?.followers || 3}</div>
-            </div>
-          </div>
-        </div>
+
 
         {/* 教育经历 */}
         {formValues.education && formValues.education.length > 0 && (

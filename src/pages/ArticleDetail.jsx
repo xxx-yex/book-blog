@@ -459,17 +459,6 @@ const ArticleDetail = () => {
             </span>
           </div>
 
-          {/* 管理员提示 */}
-          {isAdmin && (
-            <div className="mb-4 p-3 bg-blue-50 border border-blue-200 rounded-lg text-sm text-blue-800">
-              <CommentOutlined className="mr-2" />
-              管理员模式：选中文本后可以添加注释说明
-            </div>
-          )}
-
-          {/* 添加注释浮动按钮（管理员且选中文本时显示） */}
-          {/* 这里留空，按钮移到了 relative 容器内 */}
-
           {/* 文章内容容器 - 相对定位，用于放置注释卡片 */}
           <div className="relative">
             {/* 文章内容 */}
