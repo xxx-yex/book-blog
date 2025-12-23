@@ -171,7 +171,7 @@ const Home = () => {
                     imageRendering: 'auto'
                   }}
                   loading="eager"
-                  fetchPriority="high"
+                  fetchpriority="high"
                   onLoad={() => setBannerImageLoaded(true)}
                   onError={() => setBannerImageLoaded(false)}
                 />
@@ -192,7 +192,7 @@ const Home = () => {
                 <img 
                   src={normalizeImageUrl(homeData.avatarImage)}
                   loading="eager"
-                  fetchPriority="high" 
+                  fetchpriority="high" 
                   alt="头像" 
                   className="w-20 h-20 rounded-full object-cover"
                 />

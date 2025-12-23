@@ -2,6 +2,7 @@ const express = require('express');
 const multer = require('multer');
 const path = require('path');
 const Article = require('../models/Article');
+const Annotation = require('../models/Annotation');
 const { authMiddleware } = require('../middleware/auth');
 
 const router = express.Router();
@@ -147,6 +148,8 @@ router.delete('/:id', authMiddleware, async (req, res) => {
     if (!article) {
       return res.status(404).json({ message: '文章不存在' });
     }
+    // 删除关联的注释
+    await Annotation.deleteMany({ article: req.params.id });
     res.json({ message: '文章删除成功' });
   } catch (error) {
     console.error('删除文章错误:', error);
@@ -164,6 +167,9 @@ router.post('/batch-delete', authMiddleware, async (req, res) => {
     }
 
     const result = await Article.deleteMany({ _id: { $in: ids } });
+    // 删除关联的注释
+    await Annotation.deleteMany({ article: { $in: ids } });
+    
     res.json({ 
       message: '批量删除成功',
       deletedCount: result.deletedCount 

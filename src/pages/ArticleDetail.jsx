@@ -182,24 +182,103 @@ const ArticleDetail = () => {
     }
   };
 
-  // 渲染带注释的内容
+  // 渲染带注释的内容 - 修改为直接返回原始内容，高亮通过DOM操作实现
   const renderContentWithAnnotations = () => {
-    if (!article) return article?.content;
+    return article?.content;
+  };
 
-    let html = article.content;
+  // 在DOM渲染后应用高亮
+  useEffect(() => {
+    if (!article || !contentRef.current || annotations.length === 0) return;
+
+    // 清除现有的高亮（重置内容）
+    contentRef.current.innerHTML = article.content;
+
+    const container = contentRef.current;
+    
+    // 按位置排序，从后往前处理可以避免前面的DOM变化影响后面的偏移量？
+    // 不，我们使用基于纯文本的查找，每次都重新遍历，所以顺序不重要，
+    // 但是如果从前往后，插入节点不会影响后面文本节点的纯文本内容，但会打断文本节点。
+    // 只要我们的遍历算法能处理被打断的文本节点即可。
+    // 实际上，从后往前处理更安全，因为前面的文本节点结构完全没变。
     const sortedAnnotations = [...annotations].sort((a, b) => b.startOffset - a.startOffset);
 
-    sortedAnnotations.forEach((ann, idx) => {
-      const before = html.substring(0, ann.startOffset);
-      const selected = html.substring(ann.startOffset, ann.endOffset);
-      const after = html.substring(ann.endOffset);
-      
-      html = before + 
-        `<mark class="annotation-highlight" data-annotation-id="${ann._id}" style="background-color: #fff3cd; cursor: pointer; border-bottom: 2px solid #ffc107; position: relative;">${selected}</mark>` + 
-        after;
+    sortedAnnotations.forEach(ann => {
+      try {
+        highlightAnnotation(container, ann);
+      } catch (e) {
+        console.error('Highlight error:', e);
+      }
     });
 
-    return html;
+    // 重新计算注释卡片位置
+    // setAnnotationPositions 需要由另一个 useEffect 触发，或者在这里触发
+    // 由于我们修改了DOM，可能需要手动触发一次位置更新
+    // 这里不做处理，依赖原有的 annotationPositions useEffect 监听 annotations 变化
+    // 但 DOM 变化不会触发该 effect。我们需要强制更新。
+    // 实际上原有的 useEffect 监听的是 annotations 数组，这里只是修改 DOM。
+    // 我们可以在这里触发一个自定义事件或者状态更新。
+    // 不过，原有的 useEffect 依赖于 annotations，当 annotations 加载时会触发。
+    // 但高亮是在这之后加上的。
+    
+  }, [article, annotations]);
+
+  const highlightAnnotation = (container, annotation) => {
+    const range = createRangeFromTextOffset(container, annotation.startOffset, annotation.endOffset);
+    if (!range) return;
+
+    const mark = document.createElement('mark');
+    mark.className = 'annotation-highlight';
+    mark.setAttribute('data-annotation-id', annotation._id);
+    mark.style.backgroundColor = '#fff3cd';
+    mark.style.cursor = 'pointer';
+    mark.style.borderBottom = '2px solid #ffc107';
+    mark.style.position = 'relative';
+
+    try {
+      range.surroundContents(mark);
+    } catch (e) {
+      // 如果跨越了标签边界，surroundContents 会失败
+      // 此时使用 extractContents + insertNode
+      const fragment = range.extractContents();
+      mark.appendChild(fragment);
+      range.insertNode(mark);
+    }
+  };
+
+  const createRangeFromTextOffset = (container, start, end) => {
+    let charCount = 0;
+    const range = document.createRange();
+    let startFound = false;
+    let endFound = false;
+
+    const walker = document.createTreeWalker(
+      container, 
+      NodeFilter.SHOW_TEXT, 
+      null, 
+      false
+    );
+    
+    let node;
+    while ((node = walker.nextNode())) {
+      const textLength = node.textContent.length;
+      const nextCharCount = charCount + textLength;
+
+      if (!startFound && start >= charCount && start < nextCharCount) {
+        range.setStart(node, start - charCount);
+        startFound = true;
+      }
+
+      if (!endFound && end > charCount && end <= nextCharCount) {
+        range.setEnd(node, end - charCount);
+        endFound = true;
+        break;
+      }
+
+      charCount = nextCharCount;
+    }
+
+    return (startFound && endFound) ? range : null;
   };
 
   // 计算注释位置

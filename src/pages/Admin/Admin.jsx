@@ -879,10 +879,8 @@ const Admin = () => {
                   }
 
                   if (!newArticleId) {
-                    const errorMsg = `找不到对应的文章: ${articleTitle || articleId || '未知'}`;
-                    results.annotations.errors.push({ name: annotationTitle, error: errorMsg });
-                    results.annotations.failed++;
-                    console.warn('注释找不到对应文章:', annotation);
+                    // 如果找不到对应的文章，直接跳过，不报错
+                    console.warn('注释找不到对应文章，已跳过:', annotation);
                     continue;
                   }
 

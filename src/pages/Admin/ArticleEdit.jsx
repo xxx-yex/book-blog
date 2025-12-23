@@ -1,8 +1,8 @@
 // pages/Admin/ArticleEdit.jsx
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import ReactQuill from 'react-quill';
-import 'react-quill/dist/quill.snow.css';
+import ReactQuill from 'react-quill-new';
+import 'react-quill-new/dist/quill.snow.css';
 import { Input, Button, Select, Form, message, Card, Space, Row, Col } from 'antd';
 import { articleAPI, categoryAPI } from '../../utils/api';
 import { isAuthenticated } from '../../utils/auth';
