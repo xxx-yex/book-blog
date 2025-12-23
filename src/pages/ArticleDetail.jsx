@@ -1,6 +1,6 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { LikeOutlined, EyeOutlined, ArrowLeftOutlined, CommentOutlined, CloseOutlined, EditOutlined, DeleteOutlined } from '@ant-design/icons';
+import { LikeOutlined, EyeOutlined, ArrowLeftOutlined, CommentOutlined, CloseOutlined, EditOutlined, DeleteOutlined, RobotOutlined } from '@ant-design/icons';
 import { Button, message, Image, Modal, Input, Popover, Tooltip, Card, List, Popconfirm, Space } from 'antd';
 import { articleAPI, annotationAPI } from '../utils/api';
 import { isAuthenticated } from '../utils/auth';
@@ -24,6 +24,7 @@ const ArticleDetail = () => {
   const [editModalVisible, setEditModalVisible] = useState(false);
   const [annotationPositions, setAnnotationPositions] = useState([]);
   const [visibleAnnotationId, setVisibleAnnotationId] = useState(null); // 当前显示的注释ID
+  const [buttonPosition, setButtonPosition] = useState({ top: 0, left: 0 }); // 添加注释按钮位置
   const contentRef = useRef(null);
   const isAdmin = isAuthenticated();
 
@@ -76,9 +77,25 @@ const ArticleDetail = () => {
         preRange.setEnd(range.endContainer, range.endOffset);
         const endOffset = preRange.toString().length;
 
+        // 计算按钮位置
+        const rect = range.getBoundingClientRect();
+        const containerRect = contentRef.current.parentElement.getBoundingClientRect();
+        
+        // 按钮显示在选区右上角
+        // rect.right 是选区右边界相对于视口的x坐标
+        // rect.top 是选区上边界相对于视口的y坐标
+        // containerRect.left/top 是容器相对于视口的坐标
+        // 我们需要相对于容器的坐标
+        const relativeLeft = rect.right - containerRect.left;
+        const relativeTop = rect.top - containerRect.top;
+
+        setButtonPosition({
+          left: relativeLeft - 20, // 向左偏移一半宽度，使其居中于右上角
+          top: relativeTop - 45    // 向上偏移，显示在文字上方
+        });
+
         setSelectedText(selectedText);
         setSelectionRange({ startOffset, endOffset, range });
-        // 显示添加注释按钮（通过右键菜单或浮动按钮）
       } else {
         setSelectedText('');
         setSelectionRange(null);
@@ -451,19 +468,7 @@ const ArticleDetail = () => {
           )}
 
           {/* 添加注释浮动按钮（管理员且选中文本时显示） */}
-          {isAdmin && selectedText && selectionRange && (
-            <div className="fixed bottom-8 right-8 z-50">
-              <Button
-                type="primary"
-                icon={<CommentOutlined />}
-                onClick={handleAddComment}
-                size="large"
-                className="shadow-lg"
-              >
-                添加注释
-              </Button>
-            </div>
-          )}
+          {/* 这里留空，按钮移到了 relative 容器内 */}
 
           {/* 文章内容容器 - 相对定位，用于放置注释卡片 */}
           <div className="relative">
@@ -477,6 +482,27 @@ const ArticleDetail = () => {
               }}
             />
             
+            {/* 添加注释浮动按钮 */}
+            {selectedText && selectionRange && (
+              <div
+                className="absolute z-50"
+                style={{
+                  left: `${buttonPosition.left}px`,
+                  top: `${buttonPosition.top}px`,
+                }}
+              >
+                <Tooltip title="添加注释">
+                  <Button
+                    shape="circle"
+                    icon={<RobotOutlined style={{ fontSize: '20px', color: '#1890ff' }} />}
+                    onClick={handleAddComment}
+                    className="shadow-lg flex items-center justify-center bg-white border-0 hover:bg-gray-50"
+                    style={{ width: '40px', height: '40px' }}
+                  />
+                </Tooltip>
+              </div>
+            )}
+
             {/* 注释卡片 - 定位在对应位置，只有点击高亮文字时才显示 */}
             {annotationPositions.map(({ annotation, left, top, visible }) => {
               if (!visible || visibleAnnotationId !== annotation._id) return null;
