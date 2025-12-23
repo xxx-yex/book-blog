@@ -167,5 +167,14 @@ export const travelAPI = {
   batchDelete: (ids) => api.post('/travels/batch-delete', { ids }),
 };
 
+// 注释相关
+export const annotationAPI = {
+  getAll: () => api.get('/annotations/all'),
+  getByArticle: (articleId) => api.get(`/annotations/article/${articleId}`),
+  create: (data) => api.post('/annotations', data),
+  update: (id, data) => api.put(`/annotations/${id}`, data),
+  delete: (id) => api.delete(`/annotations/${id}`),
+};
+
 export default api;
 

@@ -61,7 +61,9 @@ const ArticleEdit = () => {
     toolbar: [
       [{ 'header': [1, 2, 3, false] }],
       ['bold', 'italic', 'underline', 'strike', 'blockquote'],
+      [{ 'color': [] }, { 'background': [] }],
       [{ 'list': 'ordered'}, { 'list': 'bullet' }],
+      [{ 'align': [] }],
       ['link', 'image', 'code-block'],
       ['clean']
     ],

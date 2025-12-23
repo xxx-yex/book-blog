@@ -24,7 +24,7 @@ import {
   ClockCircleOutlined,
   ReloadOutlined
 } from '@ant-design/icons';
-import { categoryAPI, articleAPI, photoAPI, bookmarkAPI, homeAPI, eventAPI, travelAPI } from '../../utils/api';
+import { categoryAPI, articleAPI, photoAPI, bookmarkAPI, homeAPI, eventAPI, travelAPI, annotationAPI } from '../../utils/api';
 import { isAuthenticated } from '../../utils/auth';
 import LocationPicker from '../../components/LocationPicker';
 import { marked } from 'marked';
@@ -314,7 +314,7 @@ const Admin = () => {
       message.info('开始导出数据，正在收集图片文件...');
       
       // 获取所有数据
-      const [categoriesData, articlesData, photosData, bookmarksData, homeData, eventsData, travelsData] = await Promise.all([
+      const [categoriesData, articlesData, photosData, bookmarksData, homeData, eventsData, travelsData, annotationsData] = await Promise.all([
         categoryAPI.getAll(),
         articleAPI.getAll(),
         photoAPI.getAll(),
@@ -322,6 +322,7 @@ const Admin = () => {
         homeAPI.get(),
         eventAPI.getAll(),
         travelAPI.getAll(),
+        annotationAPI.getAll().catch(() => []), // 如果失败返回空数组
       ]);
 
       // 创建zip实例
@@ -447,6 +448,17 @@ const Admin = () => {
             }
             return result;
           }) : [],
+          annotations: Array.isArray(annotationsData) ? annotationsData.map(ann => {
+            const result = { ...ann };
+            // 保存原始文章ID和标题，用于导入时匹配
+            if (ann.article && typeof ann.article === 'object') {
+              result.articleTitle = ann.article.title;
+              result.articleId = ann.article._id || ann.article;
+            } else {
+              result.articleId = ann.article;
+            }
+            return result;
+          }) : [],
         },
       };
 
@@ -545,7 +557,7 @@ const Admin = () => {
         return false;
       }
 
-      const { categories, articles, photos, bookmarks, home, events, travels } = importData.data;
+      const { categories, articles, photos, bookmarks, home, events, travels, annotations } = importData.data;
 
       // 统计数据量
       const stats = {
@@ -556,6 +568,7 @@ const Admin = () => {
         home: home ? 1 : 0,
         events: Array.isArray(events) ? events.length : 0,
         travels: Array.isArray(travels) ? travels.length : 0,
+        annotations: Array.isArray(annotations) ? annotations.length : 0,
       };
 
       const totalItems = stats.categories + stats.articles + stats.photos + stats.bookmarks + stats.home + stats.events + stats.travels;
@@ -577,6 +590,7 @@ const Admin = () => {
               {stats.bookmarks > 0 && <li>书签：{stats.bookmarks} 个</li>}
               {stats.events > 0 && <li>时间事件：{stats.events} 个</li>}
               {stats.travels > 0 && <li>旅行日记：{stats.travels} 条</li>}
+              {stats.annotations > 0 && <li>文章注释：{stats.annotations} 个</li>}
               {stats.home > 0 && <li>首页配置：1 个</li>}
             </ul>
             <p className="mt-3 text-red-600 text-sm font-semibold">
@@ -597,6 +611,7 @@ const Admin = () => {
               bookmarks: { success: 0, failed: 0, errors: [] },
               events: { success: 0, failed: 0, errors: [] },
               travels: { success: 0, failed: 0, errors: [] },
+              annotations: { success: 0, failed: 0, errors: [] },
               home: { success: 0, failed: 0, errors: [] },
             };
 
@@ -834,6 +849,61 @@ const Admin = () => {
               }
             }
 
+            // 导入注释（需要在文章导入之后，因为注释需要关联文章）
+            if (Array.isArray(annotations) && annotations.length > 0) {
+              message.info(`正在导入 ${annotations.length} 个注释...`);
+              // 获取所有已导入的文章，用于匹配
+              const allArticles = await articleAPI.getAll();
+              const articleTitleMap = new Map(); // 文章标题 -> 新文章ID
+              allArticles.forEach(article => {
+                articleTitleMap.set(article.title, article._id);
+              });
+
+              for (const annotation of annotations) {
+                let annotationTitle = annotation?.selectedText || '未知注释';
+                try {
+                  const { _id, __v, createdAt, updatedAt, articleTitle, articleId, ...annotationData } = annotation;
+                  annotationTitle = annotationData.selectedText || '未知注释';
+                  
+                  // 根据文章标题找到新导入的文章ID
+                  let newArticleId = null;
+                  if (articleTitle && articleTitleMap.has(articleTitle)) {
+                    newArticleId = articleTitleMap.get(articleTitle);
+                  } else if (articleId) {
+                    // 如果标题匹配失败，尝试通过旧ID查找（如果文章导入时保留了映射关系）
+                    // 这里简化处理，如果找不到就跳过
+                    const foundArticle = allArticles.find(a => a.title === (annotation.articleTitle || ''));
+                    if (foundArticle) {
+                      newArticleId = foundArticle._id;
+                    }
+                  }
+
+                  if (!newArticleId) {
+                    const errorMsg = `找不到对应的文章: ${articleTitle || articleId || '未知'}`;
+                    results.annotations.errors.push({ name: annotationTitle, error: errorMsg });
+                    results.annotations.failed++;
+                    console.warn('注释找不到对应文章:', annotation);
+                    continue;
+                  }
+
+                  // 创建注释
+                  await annotationAPI.create({
+                    ...annotationData,
+                    article: newArticleId,
+                  });
+                  results.annotations.success++;
+                } catch (error) {
+                  const errorMsg = error.response?.data?.message || error.message || '未知错误';
+                  results.annotations.errors.push({ 
+                    name: annotationTitle, 
+                    error: errorMsg 
+                  });
+                  results.annotations.failed++;
+                  console.error('导入注释失败:', annotation, error);
+                }
+              }
+            }
+
             // 导入首页配置（一次性上传所有数据：图片+文字数据）
             if (home) {
               try {
@@ -886,6 +956,7 @@ const Admin = () => {
                   bookmarks: '书签',
                   events: '时间事件',
                   travels: '旅行日记',
+                  annotations: '文章注释',
                   home: '首页配置'
                 };
                 value.errors.forEach(err => {
@@ -1967,7 +2038,7 @@ const Admin = () => {
               <div className="p-4 border border-bg-300 rounded-lg">
                 <h3 className="text-base font-semibold text-text-100 mb-2">导出数据</h3>
                 <p className="text-sm text-text-200 mb-4">
-                  导出所有数据为 ZIP 压缩包，包含：分类、文章、相册（含图片）、书签、时间事件、旅行日记（含图片）、首页配置（含头像和Banner图片）。压缩包内包含 data.json 数据文件和 images 图片文件夹。
+                  导出所有数据为 ZIP 压缩包，包含：分类、文章、文章注释、相册（含图片）、书签、时间事件、旅行日记（含图片）、首页配置（含头像和Banner图片）。压缩包内包含 data.json 数据文件和 images 图片文件夹。
                 </p>
                 <Button
                   className="bg-gray-800 text-white hover:bg-gray-700 border-none"

@@ -128,6 +128,7 @@ app.use('/api/home', require('./routes/home'));
 app.use('/api/bookmarks', require('./routes/bookmarks'));
 app.use('/api/events', require('./routes/events'));
 app.use('/api/travels', require('./routes/travels'));
+app.use('/api/annotations', require('./routes/annotations'));
 
 // 健康检查
 app.get('/health', (req, res) => {

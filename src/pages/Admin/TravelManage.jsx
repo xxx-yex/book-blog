@@ -66,9 +66,8 @@ function EditableField({ value, onChange, onBlur, inputType = 'text', className 
 
   if (editing) {
     return (
-      <div className={className + ' flex items-center gap-1'}>
-        {
-          field === 'location' &&
+      <div className="flex items-center gap-1">
+        {field === 'location' && (
           <Tooltip title="获取当前位置">
             <Button
               size="small"
@@ -80,22 +79,37 @@ function EditableField({ value, onChange, onBlur, inputType = 'text', className 
               aria-label="自动填写当前位置"
             />
           </Tooltip>
-        }
-        {
-          inputType === 'textarea' ? (
-            <Input.TextArea ref={ref} value={innerValue}
-              onChange={e => setInnerValue(e.target.value)}
-              onBlur={handleSave} autoSize className={''} {...rest} />
-          ) : inputType === 'number' ? (
-            <Input ref={ref} type="number" value={innerValue}
-              onChange={e => setInnerValue(e.target.value)}
-              onBlur={handleSave} className={''} {...rest} />
-          ) : (
-            <Input ref={ref} value={innerValue}
-              onChange={e => setInnerValue(e.target.value)}
-              onBlur={handleSave} className={''} {...rest} />
-          )
-        }
+        )}
+        {inputType === 'textarea' ? (
+          <Input.TextArea 
+            ref={ref} 
+            value={innerValue}
+            onChange={e => setInnerValue(e.target.value)}
+            onBlur={handleSave} 
+            autoSize 
+            className={className} 
+            {...rest} 
+          />
+        ) : inputType === 'number' ? (
+          <Input 
+            ref={ref} 
+            type="number" 
+            value={innerValue}
+            onChange={e => setInnerValue(e.target.value)}
+            onBlur={handleSave} 
+            className={className} 
+            {...rest} 
+          />
+        ) : (
+          <Input 
+            ref={ref} 
+            value={innerValue}
+            onChange={e => setInnerValue(e.target.value)}
+            onBlur={handleSave} 
+            className={className} 
+            {...rest} 
+          />
+        )}
       </div>
     );
   }
