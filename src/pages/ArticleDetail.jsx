@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { LikeOutlined, EyeOutlined, ArrowLeftOutlined, CommentOutlined, CloseOutlined, EditOutlined, DeleteOutlined, RobotOutlined } from '@ant-design/icons';
-import { Button, message, Image, Modal, Input, Popover, Tooltip, Card, List, Popconfirm, Space } from 'antd';
+import { LikeOutlined, EyeOutlined, ArrowLeftOutlined, CommentOutlined, CloseOutlined, EditOutlined, DeleteOutlined, RobotOutlined, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons';
+import { Button, message, Image, Modal, Input, Popover, Tooltip, Card, List, Popconfirm, Space, Anchor, FloatButton } from 'antd';
 import { articleAPI, annotationAPI } from '../utils/api';
 import { isAuthenticated } from '../utils/auth';
 import './ArticleDetail.css';
@@ -25,8 +25,47 @@ const ArticleDetail = () => {
   const [annotationPositions, setAnnotationPositions] = useState([]);
   const [visibleAnnotationId, setVisibleAnnotationId] = useState(null); // 当前显示的注释ID
   const [buttonPosition, setButtonPosition] = useState({ top: 0, left: 0 }); // 添加注释按钮位置
+  const [tocItems, setTocItems] = useState([]); // 目录数据
+  const [showToc, setShowToc] = useState(true); // 是否显示目录
   const contentRef = useRef(null);
+  const scrollContainerRef = useRef(null); // 滚动容器
   const isAdmin = isAuthenticated();
+
+  // 生成目录
+  useEffect(() => {
+    if (!article || !contentRef.current) return;
+
+    const headers = contentRef.current.querySelectorAll('h1, h2, h3');
+    const items = [];
+    const stack = []; // { level, children }
+
+    headers.forEach((header, index) => {
+      const id = header.id || `heading-${index}`;
+      header.id = id;
+      const level = parseInt(header.tagName.replace('H', ''), 10);
+      
+      const item = {
+        key: id,
+        href: `#${id}`,
+        title: header.innerText,
+        children: [],
+      };
+
+      while (stack.length > 0 && stack[stack.length - 1].level >= level) {
+        stack.pop();
+      }
+
+      if (stack.length === 0) {
+        items.push(item);
+      } else {
+        stack[stack.length - 1].children.push(item);
+      }
+
+      stack.push({ level, children: item.children });
+    });
+
+    setTocItems(items);
+  }, [article]);
 
   useEffect(() => {
     loadArticle();
@@ -417,11 +456,11 @@ const ArticleDetail = () => {
   }
 
   return (
-    <div className="w-full h-full bg-bg-200 overflow-y-auto">
-      {/* 主容器：文章内容 + 注释侧边栏 */}
-      <div className="flex gap-4 p-4 md:p-8">
+    <div ref={scrollContainerRef} className="w-full h-full bg-bg-200 overflow-y-auto" id="scroll-container">
+      {/* 主容器：文章内容 + 注释侧边栏 + 目录侧边栏 */}
+      <div className="flex gap-4 p-4 md:p-8 max-w-[1600px] mx-auto relative">
         {/* 文章内容区 */}
-        <div className="flex-1">
+        <div className="flex-1 min-w-0">
           {/* 返回按钮 */}
           <button
             onClick={() => navigate('/')}
@@ -568,6 +607,56 @@ const ArticleDetail = () => {
           </div>
         </div>
         </div>
+
+        {/* 目录侧边栏 - 在大屏幕显示 */}
+        {showToc && (
+          <div className="hidden xl:block w-64 shrink-0 transition-all duration-300">
+            <div className="sticky top-8">
+              <div className="bg-bg-100 rounded-xl shadow-sm border border-bg-300 p-4">
+                <div className="flex justify-between items-center mb-4 px-2">
+                  <h3 className="font-bold text-lg text-text-100">目录</h3>
+                  <Button 
+                    type="text" 
+                    icon={<MenuFoldOutlined />} 
+                    onClick={() => setShowToc(false)}
+                    className="text-text-200 hover:text-text-100"
+                    title="收起目录"
+                  />
+                </div>
+                {tocItems.length > 0 ? (
+                  <Anchor
+                    items={tocItems}
+                    targetOffset={20}
+                    affix={false}
+                    showInkInFixed={true}
+                    getContainer={() => scrollContainerRef.current}
+                    onClick={(e, link) => {
+                      e.preventDefault();
+                      const target = document.getElementById(link.href.replace('#', ''));
+                      if (target) {
+                        target.scrollIntoView({ behavior: 'smooth' });
+                      }
+                    }}
+                    className="article-toc"
+                  />
+                ) : (
+                  <div className="text-text-200 text-sm px-2">暂无目录</div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* 悬浮按钮 - 用于展开目录 */}
+        {!showToc && (
+          <FloatButton
+            icon={<MenuUnfoldOutlined />}
+            type="primary"
+            style={{ right: 24, bottom: 24 }}
+            onClick={() => setShowToc(true)}
+            tooltip="显示目录"
+          />
+        )}
       </div>
 
       {/* 添加注释弹窗 */}

@@ -92,3 +92,21 @@
   text-decoration: underline;
 }
 
+/* 目录样式适配 */
+.article-toc .ant-anchor-link-title {
+  color: var(--text-200);
+  font-size: 0.9em;
+}
+
+.article-toc .ant-anchor-link-active > .ant-anchor-link-title {
+  color: var(--text-100);
+  font-weight: 600;
+}
+
+.article-toc .ant-anchor-ink::before {
+  background-color: var(--bg-300);
+}
+
+.article-toc .ant-anchor-ink-ball {
+  border-color: var(--text-100);
+}
