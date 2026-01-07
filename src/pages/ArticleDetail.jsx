@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { LikeOutlined, EyeOutlined, ArrowLeftOutlined, CommentOutlined, CloseOutlined, EditOutlined, DeleteOutlined, RobotOutlined, MenuFoldOutlined, MenuUnfoldOutlined } from '@ant-design/icons';
-import { Button, message, Image, Modal, Input, Popover, Tooltip, Card, List, Popconfirm, Space, Anchor, FloatButton } from 'antd';
+import { Button, message, Image, Modal, Input, Popover, Tooltip, Card, List, Popconfirm, Space, FloatButton, Tree } from 'antd';
 import { articleAPI, annotationAPI } from '../utils/api';
 import { isAuthenticated } from '../utils/auth';
 import './ArticleDetail.css';
@@ -608,9 +608,9 @@ const ArticleDetail = () => {
         </div>
         </div>
 
-        {/* 目录侧边栏 - 在大屏幕显示 */}
+        {/* 目录侧边栏 - 悬浮在右侧上方，不占用文章布局 */}
         {showToc && (
-          <div className="hidden xl:block w-64 shrink-0 transition-all duration-300">
+          <div className="hidden xl:block absolute right-8 top-8 z-40 w-64">
             <div className="sticky top-8">
               <div className="bg-bg-100 rounded-xl shadow-sm border border-bg-300 p-4">
                 <div className="flex justify-between items-center mb-4 px-2">
@@ -624,17 +624,23 @@ const ArticleDetail = () => {
                   />
                 </div>
                 {tocItems.length > 0 ? (
-                  <Anchor
-                    items={tocItems}
-                    targetOffset={20}
-                    affix={false}
-                    showInkInFixed={true}
-                    getContainer={() => scrollContainerRef.current}
-                    onClick={(e, link) => {
-                      e.preventDefault();
-                      const target = document.getElementById(link.href.replace('#', ''));
-                      if (target) {
-                        target.scrollIntoView({ behavior: 'smooth' });
+                  <Tree
+                    treeData={tocItems}
+                    defaultExpandAll
+                    showLine
+                    selectable
+                    onSelect={(keys) => {
+                      const key = keys && keys[0];
+                      if (!key) return;
+                      const target = document.getElementById(String(key));
+                      if (!target) return;
+
+                      const sc = scrollContainerRef.current;
+                      if (sc) {
+                        const offsetTop = sc.scrollTop + target.getBoundingClientRect().top - sc.getBoundingClientRect().top - 20;
+                        sc.scrollTo({ top: offsetTop, behavior: 'smooth' });
+                      } else {
+                        target.scrollIntoView({ behavior: 'smooth', block: 'start' });
                       }
                     }}
                     className="article-toc"
